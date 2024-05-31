@@ -20,12 +20,13 @@ def checksum(source: bytes) -> int:
 
 
 my_id = uuid.uuid4().int & 0xFFFF
-header = HEADER.pack(ICMP_ECHO_REQUEST, 0, 0, my_id, 1)
+sequence = 1
+header = HEADER.pack(ICMP_ECHO_REQUEST, 0, 0, my_id, sequence)
 bytes_in_double = struct.calcsize("d")
 data = (192 - bytes_in_double) * b"Q"
 data = struct.pack("d", time.perf_counter()) + data
 csum = checksum(header + data)
-header = HEADER.pack(ICMP_ECHO_REQUEST, 0, csum, my_id, 1)
+header = HEADER.pack(ICMP_ECHO_REQUEST, 0, csum, my_id, sequence)
 packet = header + data
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, ICMP)
