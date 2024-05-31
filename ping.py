@@ -42,10 +42,9 @@ if type_ != ICMP_ECHO_REPLY:
 id_ = sock.getsockname()[1]
 
 if packet_id != id_:
-    print(type_, code, csum, packet_id, sequence)
     print(f"Wrong ID. Expected {id_}. Got {packet_id}!")
 
 data = reply[8:8 + bytes_in_double]
 time_sent = struct.unpack("d", data)[0]
 dt = time_received - time_sent
-print(f"time={dt*1000:.1f}ms")
+print(f"{len(reply)} bytes from {host} time={dt*1000:.1f}ms")
