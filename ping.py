@@ -1,4 +1,6 @@
 import errno
+import os
+import platform
 import socket
 import struct
 import sys
@@ -11,14 +13,24 @@ HEADER = struct.Struct(HEADER_FORMAT)
 TIME_FORMAT = "d"
 TIME = struct.Struct(TIME_FORMAT)
 
-ICMPv4 = socket.getprotobyname("icmp")
-ICMPv6 = socket.getprotobyname("ipv6-icmp")
 
-ICMP_ECHO_REQUEST = 8
-ICMP_ECHO_REPLY = 0
+class ICMPv4:
+    proto = socket.getprotobyname("icmp")
+    ECHO_REQUEST = 8
+    ECHO_REPLY = 0
+
+
+class ICMPv6:
+    proto = socket.getprotobyname("ipv6-icmp")
+    ECHO_REQUEST = 128
+    ECHO_REPLY = 129
+
 
 ICMP_DEFAULT_CODE = 0  # the code for ECHO_REPLY and ECHO_REQUEST
 ICMP_DEFAULT_SIZE = 64
+
+# No IP Header when unpriviledged on Linux
+CAN_HAVE_IP_HEADER = os.name != 'posix' or platform.system() == 'Darwin'
 
 
 def checksum(source: bytes) -> int:
@@ -29,8 +41,8 @@ def checksum(source: bytes) -> int:
     return ~result & ((1 << 16) - 1)  # Ensure 16-bit
 
 
-def request_packet(
-    request: int = ICMP_ECHO_REQUEST,
+def echo_request_packet(
+    request: int = ICMPv4.ECHO_REQUEST,
     code: int = ICMP_DEFAULT_CODE,
     icmp_id: int = 1,
     sequence: int = 1,
@@ -41,15 +53,16 @@ def request_packet(
     ) * b"Q"  # Using double to store current time.
     payload = TIME.pack(time.perf_counter()) + padding
     csum = checksum(header + payload)
-    header = HEADER.pack(ICMP_ECHO_REQUEST, 0, csum, icmp_id, sequence)
+    header = HEADER.pack(request, 0, csum, icmp_id, sequence)
     return header + payload
 
 
-def reply_packet(source: bytes):
-    type_, code, csum, packet_id, sequence = HEADER.unpack_from(source, offset=0)
-    if type_ not in (ICMP_ECHO_REPLY,):
+def echo_reply_packet(source: bytes, has_ip_header = False):
+    offset = 20 if has_ip_header else 0
+    type_, code, csum, packet_id, sequence = HEADER.unpack_from(source, offset=offset)
+    if type_ not in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}:
         return
-    (time_sent,) = TIME.unpack_from(source, offset=HEADER.size)
+    (time_sent,) = TIME.unpack_from(source, offset=offset + HEADER.size)
     return type_, code, csum, packet_id, sequence, time_sent
 
 
@@ -59,7 +72,7 @@ def icmp_socket(
     proto: int | None = None,
 ) -> socket.socket:
     if proto is None:
-        proto = ICMPv4 if family == socket.AF_INET else ICMPv6
+        proto = ICMPv4.proto if family == socket.AF_INET else ICMPv6.proto
 
     if type is None:
         try:
@@ -75,21 +88,23 @@ def icmp_socket(
 def main():
     host = sys.argv[1]
     ip = socket.gethostbyname(host)
+    real_host = socket.gethostbyaddr(ip)[0]
     sock = icmp_socket()
 
     my_id = uuid.uuid4().int & 0xFFFF
-    packet = request_packet(icmp_id=my_id)
+    packet = echo_request_packet(icmp_id=my_id)
     sock.sendto(packet, (ip, 0))
     reply = sock.recv(1024)
     time_received = time.perf_counter()
-    type_, code, csum, packet_id, sequence, time_sent = reply_packet(reply)
+    type_, code, csum, packet_id, icmp_seq, time_sent = echo_reply_packet(reply)
 
     id_ = sock.getsockname()[1]
     if packet_id != id_:
         print(f"Wrong ID. Expected {id_}. Got {packet_id}!")
 
     dt = time_received - time_sent
-    print(f"{len(reply)} bytes from {host} time={dt*1000:.1f}ms")
+    print(f"PING {host} ({ip})")
+    print(f"{len(reply)} bytes from {real_host} ({ip}): {icmp_seq=} time={dt*1000:.1f}ms")
 
 
 if __name__ == "__main__":
