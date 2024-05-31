@@ -12,23 +12,11 @@ ICMP_ECHO_REQUEST = 8
 ICMP_ECHO_REPLY = 0
 
 
-def checksum(buffer):
-    length = len(buffer)
-    csum = 0
-    i = 0
-    while length > 1:
-        csum += buffer[i + 1] + (buffer[i + 0] << 8)
-        csum &= 0xffff_ffff
-        length -= 2
-        i += 2
-
-    if i < len(buffer):
-        csum += buffer[-1]
-        csum &= 0xffff_ffff
-
-    csum = (csum >> 16) + (csum & 0xffff)  # Fold high 16 bits
-    csum += (csum >> 16)
-    return ~csum & 0xffff
+def checksum(source: bytes) -> int:
+    result = sum(source[::2]) + (sum(source[1::2]) << (8))  # Even bytes (odd indexes) shift 1 byte to the left.
+    while result >= 0x10000:  # Ones' complement sum.
+        result = sum(divmod(result, 0x10000))  # Each carry add to right most bit.
+    return ~result & ((1 << 16) - 1)  # Ensure 16-bit
 
 
 my_id = uuid.uuid4().int & 0xFFFF
