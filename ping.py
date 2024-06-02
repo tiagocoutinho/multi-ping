@@ -63,6 +63,11 @@ def echo_request_packet(
     return header + payload
 
 
+def raw_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
+    offset = IP_HEADER.size if has_ip_header else 0
+    return HEADER.unpack_from(source, offset=offset)
+
+
 def raw_echo_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
     offset = IP_HEADER.size if has_ip_header else 0
     return HEADER.unpack_from(source, offset=offset)
@@ -100,7 +105,8 @@ def icmp_socket(
                 raise
             return icmp_socket(family, socket.SOCK_DGRAM, proto)
     else:
-        return socket.socket(family, type, proto)
+        sock = socket.socket(family, type, proto)
+        return sock
 
 
 def resolved_from_address(address, sock):
@@ -109,7 +115,7 @@ def resolved_from_address(address, sock):
     return random.choice(info)[4]
 
 
-def ping(sock, icmp_id, address):
+def ping(sock: socket.socket, icmp_id: int, address: str):
     resolved_address = resolved_from_address(address, sock)
     packet = echo_request_packet(icmp_id=icmp_id)
     sock.sendto(packet, resolved_address)
@@ -121,8 +127,21 @@ def ping(sock, icmp_id, address):
             return response
 
 
+def pings(sock: socket.socket, icmp_id: int, addresses: list[str]):
+    resolved_addresses = [resolved_from_address(address, sock) for address in addresses]
+    packet = echo_request_packet(icmp_id=icmp_id)
+    for resolved_address in resolved_addresses:
+        sock.sendto(packet, resolved_address)
+    for i in range(len(addresses)):
+        data, addr = sock.recvfrom(1024)
+        time_received = time.perf_counter()
+        if response := echo_reply_packet(sock, icmp_id, data, time_received):
+            response.address = addr[0]
+            yield response
+
+
 class Response:
-    def __init__(self, data, has_ip_header, time_received):
+    def __init__(self, data: bytes, has_ip_header: bool, time_received: float):
         self.address = None
         self.data = data
         self.has_ip_header = has_ip_header
@@ -139,17 +158,17 @@ class Response:
         return len(self.data)
 
     @property
-    def is_echo(self):
+    def is_echo(self) -> bool:
         return self.type in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}
 
     @property
-    def time_sent(self):
+    def time_sent(self) -> float:
         offset = IP_HEADER.size if self.has_ip_header else 0
         (time_sent,) = TIME.unpack_from(self.data, offset=offset + HEADER.size)
         return time_sent
 
     @property
-    def dt(self):
+    def dt(self) -> float:
         return self.time_received - self.time_sent
 
 
@@ -157,22 +176,24 @@ class ICMP:
     def __init__(self, protocol=ICMPv4):
         self.id = uuid.uuid4().int & 0xFFFF
         self.protocol = protocol
-        self.socket = icmp_socket(protocol.family, proto=protocol.proto)
+        self.socket = icmp_socket(protocol.family)
 
-    def ping(self, address):
+    def ping(self, address) -> Response:
         return ping(self.socket, self.id, address)
+
+    def pings(self, addresses) -> Response:
+        return pings(self.socket, self.id, addresses)
 
 
 def main():
-    address = sys.argv[1]
+    addresses = sys.argv[1:]
     icmp = ICMP()
-    response = icmp.ping(address)
-    ip = response.address
-    real_host = socket.gethostbyaddr(ip)[0]
-    print(f"PING {address} ({ip})")
-    print(
-        f"{len(response)} bytes from {real_host} ({ip}): icmp_seq={response.sequence} time={response.dt*1000:.1f}ms"
-    )
+    for response in icmp.pings(addresses):
+        ip = response.address
+        real_host = socket.gethostbyaddr(ip)[0]
+        print(
+            f"{len(response)} bytes from {real_host} ({ip}): icmp_seq={response.sequence} time={response.dt*1000:.1f}ms"
+        )
 
 
 if __name__ == "__main__":
