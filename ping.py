@@ -63,20 +63,25 @@ def echo_request_packet(
     return header + payload
 
 
-def echo_reply_packet(sock: socket.socket, icmp_id: int, source: bytes) -> tuple:
-    has_ip_header = CAN_HAVE_IP_HEADER or sock.type == socket.SOCK_RAW
+def raw_echo_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
     offset = IP_HEADER.size if has_ip_header else 0
-    type_, code, csum, packet_id, sequence = HEADER.unpack_from(source, offset=offset)
-    if type_ not in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}:
-        print(f"Wrong type: {type_}")
+    return HEADER.unpack_from(source, offset=offset)
+
+
+def echo_reply_packet(
+    sock: socket.socket, icmp_id: int, source: bytes, time_received: float
+) -> tuple:
+    has_ip_header = CAN_HAVE_IP_HEADER or sock.type == socket.SOCK_RAW
+    response = Response(source, has_ip_header, time_received)
+    if not response.is_echo:
+        print(f"Wrong type: {response.type}")
         return
     if not has_ip_header:
         icmp_id = sock.getsockname()[1]
-    if packet_id != icmp_id:
-        print(f"Wrong ID. Expected {icmp_id}. Got {packet_id}!")
+    if response.packet_id != icmp_id:
+        print(f"Wrong ID. Expected {icmp_id}. Got {response.packet_id}!")
         return
-    (time_sent,) = TIME.unpack_from(source, offset=offset + HEADER.size)
-    return type_, code, csum, packet_id, sequence, time_sent
+    return response
 
 
 def icmp_socket(
@@ -111,51 +116,41 @@ def ping(sock, icmp_id, address):
     while True:
         data = sock.recv(1024)
         time_received = time.perf_counter()
-        if reply := echo_reply_packet(sock, icmp_id, data):
-            break
-    type_, code, _, packet_id, seq, time_sent = reply
-    result = PingResult(
-        address,
-        resolved_address,
-        data,
-        type_,
-        code,
-        packet_id,
-        seq,
-        time_sent,
-        time_received,
-    )
-    return result
+        if response := echo_reply_packet(sock, icmp_id, data, time_received):
+            response.address = resolved_address[0]
+            return response
 
 
-class PingResult:
-    def __init__(
-        self, host, addr, data, type_, code, packet_id, sequence, sent, received
-    ):
-        self.host = host
-        self.addr = addr
+class Response:
+    def __init__(self, data, has_ip_header, time_received):
+        self.address = None
         self.data = data
+        self.has_ip_header = has_ip_header
+        type_, code, _csum, packet_id, sequence = raw_echo_reply_packet(
+            data, has_ip_header
+        )
         self.type = type_
         self.code = code
         self.packet_id = packet_id
         self.sequence = sequence
-        self.time_sent = sent
-        self.time_received = received
+        self.time_received = time_received
 
     def __len__(self):
         return len(self.data)
 
     @property
+    def is_echo(self):
+        return self.type in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}
+
+    @property
+    def time_sent(self):
+        offset = IP_HEADER.size if self.has_ip_header else 0
+        (time_sent,) = TIME.unpack_from(self.data, offset=offset + HEADER.size)
+        return time_sent
+
+    @property
     def dt(self):
         return self.time_received - self.time_sent
-
-    @property
-    def ip(self):
-        return self.addr[0]
-
-    @property
-    def real_host(self):
-        return socket.gethostbyaddr(self.ip)[0]
 
 
 class ICMP:
@@ -171,10 +166,12 @@ class ICMP:
 def main():
     address = sys.argv[1]
     icmp = ICMP()
-    result = icmp.ping(address)
-    print(f"PING {result.host} ({result.ip})")
+    response = icmp.ping(address)
+    ip = response.address
+    real_host = socket.gethostbyaddr(ip)[0]
+    print(f"PING {address} ({ip})")
     print(
-        f"{len(result)} bytes from {result.real_host} ({result.ip}): icmp_seq={result.sequence} time={result.dt*1000:.1f}ms"
+        f"{len(response)} bytes from {real_host} ({ip}): icmp_seq={response.sequence} time={response.dt*1000:.1f}ms"
     )
 
 
