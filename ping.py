@@ -1,9 +1,12 @@
+import argparse
 import collections
 import errno
+import ipaddress
 import logging
 import os
 import platform
 import random
+import select
 import socket
 import struct
 import sys
@@ -18,6 +21,12 @@ IP_HEADER = struct.Struct(IP_HEADER_FORMAT)
 
 TIME_FORMAT = "d"
 TIME = struct.Struct(TIME_FORMAT)
+
+ICMP_DEFAULT_CODE = 0  # the code for ECHO_REPLY and ECHO_REQUEST
+ICMP_DEFAULT_SIZE = 64
+
+# No IP Header when unpriviledged on Linux
+CAN_HAVE_IP_HEADER = os.name != "posix" or platform.system() == "Darwin"
 
 ERROR, OK = 0, 1
 
@@ -82,13 +91,6 @@ class ICMPv6:
     proto = socket.getprotobyname("ipv6-icmp")
     ECHO_REQUEST = 128
     ECHO_REPLY = 129
-
-
-ICMP_DEFAULT_CODE = 0  # the code for ECHO_REPLY and ECHO_REQUEST
-ICMP_DEFAULT_SIZE = 64
-
-# No IP Header when unpriviledged on Linux
-CAN_HAVE_IP_HEADER = os.name != "posix" or platform.system() == "Darwin"
 
 
 def checksum(source: bytes) -> int:
@@ -172,18 +174,13 @@ def raw_echo_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
 
 
 def echo_reply_packet(
-    sock: socket.socket, icmp_id: int, source: bytes, time_received: float
+    has_ip_header: bool, icmp_id: int, source: bytes, time_received: float
 ) -> Response:
-    has_ip_header = CAN_HAVE_IP_HEADER or sock.type == socket.SOCK_RAW
-    if not has_ip_header:
-        icmp_id = sock.getsockname()[1]
     response = Response(source, has_ip_header, icmp_id, time_received)
     if not response.is_echo:
-        print(f"Wrong type: {response.type}")
-        return
+        return Err(PingError(f"Wrong type: {response.type}"))
     if response.packet_id != icmp_id:
-        print(f"Wrong ID. Expected {icmp_id}. Got {response.packet_id}!")
-        return
+        return Err(PingError(f"Wrong ID. Expected {icmp_id}. Got {response.packet_id}!"))
     return response
 
 
@@ -191,7 +188,7 @@ def icmp_socket(
     family: socket.AddressFamily = socket.AF_INET,
     type: socket.SocketKind | None = None,
     proto: int | None = None,
-    timeout: float = 1,
+    timeout: float = 0, # 0 means non blocking
 ) -> socket.socket:
     if proto is None:
         proto = ICMPv4.proto if family == socket.AF_INET else ICMPv6.proto
@@ -209,13 +206,16 @@ def icmp_socket(
         return sock
 
 
-def resolved_from_address(address, sock) -> Result:
+def resolved_from_address(address, sock_family, sock_type) -> Result:
+    logging.debug("Resolving %s...", address)
     try:
-        info = socket.getaddrinfo(address, 0, sock.family)
+        info = socket.getaddrinfo(address, 0, sock_family)
     except socket.error as error:
         return Err(error)
-    info = list(filter(lambda i: i[1] == sock.type, info))
-    return Ok(random.choice(info)[4])
+    info = list(filter(lambda i: i[1] == sock_type, info))
+    result = Ok(random.choice(info)[4])
+    logging.debug("Resolved %s to %s", address, result.value)
+    return result
 
 
 def send_to(sock, payload, address):
@@ -235,8 +235,18 @@ def recv_from(sock, n = 1024):
     return Ok((payload, address))
 
 
+def recv_from_timeout(sock, n = 1024, timeout=None):
+    try:
+        logging.info("waiting for reply (timeout=%6.3fs)...", timeout)
+        r, _, _ = select.select((sock,), (), (), timeout)
+    except socket.error as error:
+        return Err(error)
+    if not r:
+        return Err(TimeoutError("read timeout"))
+    return recv_from(sock, n)
+
+
 def ping(sock: socket.socket, icmp_id: int, address: str):
-#    resolved_address = resolved_from_address(address, sock)
     packet = echo_request_packet(icmp_id=icmp_id)
     sock.sendto(packet, address)
     while True:
@@ -247,54 +257,101 @@ def ping(sock: socket.socket, icmp_id: int, address: str):
             return response
 
 
-def pings(sock: socket.socket, icmp_id: int, addresses: list[str]):
-    addresses = {address: resolved_from_address(address, sock) for address in addresses}
+def check_elapsed(timeout_at: float | None):
+    if timeout_at is None:
+        return
+    if time.monotonic() >= timeout_at:
+        raise TimeoutError("timeout")
+
+
+class Socket:
+
+    def __init__(self, sock: socket.socket, timeout: float | None = None):
+        self.socket = sock
+        self.timeout = timeout
+
+    def __enter__(self):
+        if self.timeout:
+            self.end = time.monotonic() + self.timeout
+        else:
+            self.end = None
+        return self
+    
+    def __exit__(self, *args):
+        pass
+
+    def has_ip_header(self):
+        return CAN_HAVE_IP_HEADER or self.socket.type == socket.SOCK_RAW
+
+    def get_ip(self) -> str:
+        return self.socket.getsockname()[0]
+
+    def get_port(self) -> int:
+        return self.socket.getsockname()[1]
+
+    def get_timeout(self):
+        if self.timeout is None:
+            return None
+        return self.end - time.monotonic()
+
+    def read(self, n = 1024):
+        timeout = self.get_timeout()
+        if timeout is not None and timeout <= 0:
+            return Err(TimeoutError("timed out"))
+        return recv_from_timeout(self.socket, n, timeout)
+
+    def write(self, buff, address):
+        return send_to(self.socket, buff, address)
+
+
+def raw_pings(sock: Socket, icmp_id: int, addresses: dict[str, tuple[str, int]]):
     packet = echo_request_packet(icmp_id=icmp_id)
     reversed_addresses = {}
     for address, resolved in addresses.items():
         if resolved.is_ok():
-            result = send_to(sock, packet, resolved.value)
+            result = sock.write(packet, resolved.value)
             if result.is_ok():
                 reversed_addresses[resolved.value[0]] = address
             else:
                 yield result
         else:
             yield Err(PingError(f"{address}: {resolved.value}"))
+    has_ip_header = sock.has_ip_header()
+    if not has_ip_header:
+        icmp_id = sock.get_port()
     for _ in range(len(reversed_addresses)):
-        result = recv_from(sock)
+        result = sock.read()
         time_received = time.perf_counter()
-        if result.is_ok():
-            data, addr = result.value
-            if response := echo_reply_packet(sock, icmp_id, data, time_received):
-                address = addr[0]
-                if response.is_err():
-                    error = PingError(f"{address}: {response.error}")
-                    yield Err(error)
-                else:
-                    yield Ok((reversed_addresses.get(address), address, response))
-        else:
+        if result.is_err():
             yield result
             return
+        data, addr = result.value
+        if response := echo_reply_packet(has_ip_header, icmp_id, data, time_received):
+            address = addr[0]
+            if response.is_err():
+                yield response
+            else:
+                yield Ok((reversed_addresses.get(address), address, response))
 
 
-class ICMP:
-    def __init__(self, protocol=ICMPv4, timeout=1):
-        self.id = uuid.uuid4().int & 0xFFFF
-        self.protocol = protocol
-        self.socket = icmp_socket(protocol.family, timeout=timeout)
+def pings(sock: socket.socket, icmp_id: int, addresses: list[str], timeout: float | None = 0.2):
+    with Socket(sock, timeout) as reader:
+        addresses = {address: resolved_from_address(address, sock.family, sock.type) for address in addresses}
+        yield from raw_pings(reader, icmp_id, addresses)
 
-    def ping(self, address) -> Response:
-        return ping(self.socket, self.id, address)
 
-    def pings(self, addresses) -> Response:
-        return pings(self.socket, self.id, addresses)
+def new_id():
+    return uuid.uuid4().int & 0xFFFF
 
 
 def main():
-    logging.basicConfig(level="DEBUG")
+
+    fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
+    logging.basicConfig(level="DEBUG", format=fmt)
     addresses = sys.argv[1:]
-    icmp = ICMP()
-    for response in icmp.pings(addresses):
+    sock = icmp_socket()
+    me = new_id()
+    for response in pings(sock, me, addresses, timeout=1):
         if response.is_err():
             print(response.value)
         else:
@@ -307,3 +364,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
