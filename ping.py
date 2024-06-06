@@ -9,7 +9,6 @@ import random
 import select
 import socket
 import struct
-import sys
 import time
 import uuid
 
@@ -101,6 +100,15 @@ def checksum(source: bytes) -> int:
     return ~result & ((1 << 16) - 1)  # Ensure 16-bit
 
 
+def cycle():
+    while True:
+        yield from range(1, 2**16 - 1)
+
+
+def new_id():
+    return uuid.uuid4().int & 0xFFFF
+
+
 class Response:
     def __init__(self, data: bytes, has_ip_header: bool, icmp_id: int, time_received: float):
         self.data = data
@@ -151,15 +159,15 @@ def echo_request_packet(
     request: int = ICMPv4.ECHO_REQUEST,
     code: int = ICMP_DEFAULT_CODE,
     icmp_id: int = 1,
-    sequence: int = 1,
+    icmp_seq: int = 1,
 ) -> bytes:
-    header = HEADER.pack(request, code, 0, icmp_id, sequence)
+    header = HEADER.pack(request, code, 0, icmp_id, icmp_seq)
     padding = (
         ICMP_DEFAULT_SIZE - HEADER.size - TIME.size
     ) * b"Q"  # Using double to store current time.
     payload = TIME.pack(time.perf_counter()) + padding
     csum = checksum(header + payload)
-    header = HEADER.pack(request, 0, csum, icmp_id, sequence)
+    header = HEADER.pack(request, 0, csum, icmp_id, icmp_seq)
     return header + payload
 
 
@@ -237,7 +245,7 @@ def recv_from(sock, n = 1024):
 
 def recv_from_timeout(sock, n = 1024, timeout=None):
     try:
-        logging.info("waiting for reply (timeout=%6.3fs)...", timeout)
+        logging.debug("waiting for reply (timeout=%6.3fs)...", timeout)
         r, _, _ = select.select((sock,), (), (), timeout)
     except socket.error as error:
         return Err(error)
@@ -246,29 +254,12 @@ def recv_from_timeout(sock, n = 1024, timeout=None):
     return recv_from(sock, n)
 
 
-def ping(sock: socket.socket, icmp_id: int, address: str):
-    packet = echo_request_packet(icmp_id=icmp_id)
-    sock.sendto(packet, address)
-    while True:
-        data, resolved_address = sock.recvfrom(1024)
-        time_received = time.perf_counter()
-        if response := echo_reply_packet(sock, icmp_id, data, time_received):
-            response.address = resolved_address[0]
-            return response
-
-
-def check_elapsed(timeout_at: float | None):
-    if timeout_at is None:
-        return
-    if time.monotonic() >= timeout_at:
-        raise TimeoutError("timeout")
-
-
 class Socket:
 
     def __init__(self, sock: socket.socket, timeout: float | None = None):
         self.socket = sock
         self.timeout = timeout
+        self.end = None
 
     def __enter__(self):
         if self.timeout:
@@ -289,13 +280,13 @@ class Socket:
     def get_port(self) -> int:
         return self.socket.getsockname()[1]
 
-    def get_timeout(self):
+    def calculate_timeout(self):
         if self.timeout is None:
             return None
         return self.end - time.monotonic()
 
     def read(self, n = 1024):
-        timeout = self.get_timeout()
+        timeout = self.calculate_timeout()
         if timeout is not None and timeout <= 0:
             return Err(TimeoutError("timed out"))
         return recv_from_timeout(self.socket, n, timeout)
@@ -304,54 +295,90 @@ class Socket:
         return send_to(self.socket, buff, address)
 
 
-def raw_pings(sock: Socket, icmp_id: int, addresses: dict[str, tuple[str, int]]):
-    packet = echo_request_packet(icmp_id=icmp_id)
-    reversed_addresses = {}
-    for address, resolved in addresses.items():
-        if resolved.is_ok():
-            result = sock.write(packet, resolved.value)
+
+
+def raw_pings(sock: socket.socket, icmp_id: int, icmp_seq: int, addresses: dict[str, tuple[str, int]], timeout: float | None):
+    packet = echo_request_packet(icmp_id=icmp_id, icmp_seq=icmp_seq)
+    with Socket(sock, timeout) as sock:
+        reversed_addresses = {}
+        for address, resolved in addresses.items():
+            result = sock.write(packet, resolved)
             if result.is_ok():
-                reversed_addresses[resolved.value[0]] = address
+                reversed_addresses[resolved[0]] = address
             else:
                 yield result
+        has_ip_header = sock.has_ip_header()
+        if not has_ip_header:
+            icmp_id = sock.get_port()
+        n = len(reversed_addresses)
+        while n > 0:
+            result = sock.read()
+            time_received = time.perf_counter()
+            if result.is_err():
+                for address, reversed_address in reversed_addresses.items():
+                    yield Err(PingError(f"{reversed_address} ({address}): {result.value}"))
+                return
+            data, addr = result.value
+            if response := echo_reply_packet(has_ip_header, icmp_id, data, time_received):
+                address = addr[0]
+                if response.sequence != icmp_seq:
+                    logging.info("received old reply from %s with icmp_seq=%d", address, response.sequence)
+                    # probably an old reply that timed out
+                    continue
+                if response.is_err():
+                    yield response
+                else:
+                    reversed_address = reversed_addresses.pop(address)
+                    yield Ok((reversed_address, address, response))
+                n -= 1
+
+
+def pings(sock: socket.socket, icmp_id: int, addresses: list[str], interval: float = 1, count: int | None = None, timeout: float | None = 1):
+    sequence = cycle() if count is None else range(1, count+1)
+
+    active_addresses = {}
+    for address in addresses:
+        resolved = resolved_from_address(address, sock.family, sock.type)
+        if resolved.is_ok():
+            active_addresses[address] = resolved.value
         else:
-            yield Err(PingError(f"{address}: {resolved.value}"))
-    has_ip_header = sock.has_ip_header()
-    if not has_ip_header:
-        icmp_id = sock.get_port()
-    for _ in range(len(reversed_addresses)):
-        result = sock.read()
-        time_received = time.perf_counter()
-        if result.is_err():
-            yield result
-            return
-        data, addr = result.value
-        if response := echo_reply_packet(has_ip_header, icmp_id, data, time_received):
-            address = addr[0]
-            if response.is_err():
-                yield response
-            else:
-                yield Ok((reversed_addresses.get(address), address, response))
+            yield resolved
+
+    for icmp_seq in sequence:
+        yield from raw_pings(sock, icmp_id, icmp_seq, active_addresses, timeout)
+        time.sleep(interval)
 
 
-def pings(sock: socket.socket, icmp_id: int, addresses: list[str], timeout: float | None = 0.2):
-    with Socket(sock, timeout) as reader:
-        addresses = {address: resolved_from_address(address, sock.family, sock.type) for address in addresses}
-        yield from raw_pings(reader, icmp_id, addresses)
+def addresses_args(text):
+    try:
+        return [str(addr) for addr in ipaddress.ip_network(text)]
+    except ValueError:
+        return [text]
 
 
-def new_id():
-    return uuid.uuid4().int & 0xFFFF
+def cmd_line_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--interval", type=float, help="wait interval between group of pings (seconds)", default=1)
+    parser.add_argument("-w", "--timeout", type=float, help="time to wait for response (seconds)", default=1)
+    parser.add_argument("-c", "--count", type=float, help="stop after sending count pings", default=None)
+    parser.add_argument("--log-level", choices=["debug", "info", "warn", "error"], help="log level", default="info")
+    parser.add_argument("addresses", type=addresses_args, nargs="+", help="host names, IPs or networks")
+    return parser
+
+
+def parse_cmd_line_args(args=None):
+    parser = cmd_line_parser()
+    return parser.parse_args(args)
 
 
 def main():
-
+    args = parse_cmd_line_args()
     fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
-    logging.basicConfig(level="DEBUG", format=fmt)
-    addresses = sys.argv[1:]
+    logging.basicConfig(level=args.log_level.upper(), format=fmt)
+    addresses = [addr for addresses in args.addresses for addr in addresses]
     sock = icmp_socket()
     me = new_id()
-    for response in pings(sock, me, addresses, timeout=1):
+    for response in pings(sock, me, addresses, interval=args.interval, count=args.count, timeout=args.timeout):
         if response.is_err():
             print(response.value)
         else:
