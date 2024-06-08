@@ -185,7 +185,7 @@ def raw_echo_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
 
 def echo_reply_packet(
     has_ip_header: bool, icmp_id: int, source: bytes, time_received: float
-) -> Response:
+) -> Result:
     response = Response(source, has_ip_header, icmp_id, time_received)
     if not response.is_echo:
         return Err(PingError(f"Wrong type: {response.type}"))
@@ -193,7 +193,9 @@ def echo_reply_packet(
         return Err(
             PingError(f"Wrong ID. Expected {icmp_id}. Got {response.packet_id}!")
         )
-    return response
+    if response.is_err():
+        return Err(response.error)
+    return Ok(response)
 
 
 def icmp_socket(
@@ -326,10 +328,12 @@ def raw_pings(
                     yield Err(PingError(f"{address}: {result.value}"))
                 return
             data, addr = result.value
-            if response := echo_reply_packet(
-                has_ip_header, icmp_id, data, time_received
-            ):
+            if result := echo_reply_packet(has_ip_header, icmp_id, data, time_received):
                 address = addr[0]
+                if result.is_err():
+                    pending.discard(address)
+                    yield result
+                response = result.value
                 if response.sequence != icmp_seq:
                     logging.info(
                         "received old reply from %s with icmp_seq=%d",
@@ -338,11 +342,8 @@ def raw_pings(
                     )
                     # probably an old reply that timed out
                     continue
-                if response.is_err():
-                    yield response
-                else:
-                    pending.discard(address)
-                    yield Ok((address, response))
+                pending.discard(address)
+                yield Ok((address, response))
                 n -= 1
 
 
@@ -454,6 +455,12 @@ def main(args=None):
             print(message)
     except KeyboardInterrupt:
         print()
+
+
+def demo():
+    with open("sites.txt") as f:
+        hosts = [i.strip() for i in f][1:51]
+        main(["--log-level=info", "--timeout=5"] + hosts)
 
 
 if __name__ == "__main__":
