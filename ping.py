@@ -169,13 +169,8 @@ def echo_request_packet(
     ) * b"Q"  # Using double to store current time.
     payload = TIME.pack(time.perf_counter()) + padding
     csum = checksum(header + payload)
-    header = HEADER.pack(request, 0, csum, icmp_id, icmp_seq)
+    header = HEADER.pack(request, code, csum, icmp_id, icmp_seq)
     return header + payload
-
-
-def raw_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
-    offset = IP_HEADER.size if has_ip_header else 0
-    return HEADER.unpack_from(source, offset=offset)
 
 
 def raw_echo_reply_packet(source: bytes, has_ip_header: bool = False) -> tuple:
@@ -223,16 +218,16 @@ def icmp_socket(
 def resolved_from_address(address, sock_family, sock_type) -> Result:
     logging.info("Resolving %s...", address)
     try:
-        info = socket.getaddrinfo(address, 0, sock_family)
+        info = socket.getaddrinfo(address, 0, sock_family, sock_type)
     except socket.error as error:
         return Err(error)
-    info = list(filter(lambda i: i[1] == sock_type, info))
     result = Ok(random.choice(info)[4])
     logging.info("Resolved %s to %s", address, result.value)
     return result
 
 
 def send_to(sock, payload, address):
+    print(payload, len(payload), address)
     logging.debug("sending %d bytes to %s", len(payload), address[0])
     try:
         return Ok(sock.sendto(payload, address))
