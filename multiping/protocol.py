@@ -45,18 +45,27 @@ ICMP_DEFAULT_CODE = 0  # the code for ECHO_REPLY and ECHO_REQUEST
 ICMP_DEFAULT_SIZE = 64
 ICMP_DEFAULT_PAYLOAD = ICMP_DEFAULT_SIZE * b"Q"
 
+ICMP_PROTOCOL = socket.getprotobyname("icmp")
+ICMP_V6_PROTOCOL = socket.getprotobyname("ipv6-icmp")
+
+ECHO_REQUEST = 8
+ECHO_REPLY = 0
+ECHO_V6_REQUEST = 128
+ECHO_V6_REPLY = 129
+
+
 class ICMPv4:
     family = socket.AF_INET
-    proto = socket.getprotobyname("icmp")
-    ECHO_REQUEST = 8
-    ECHO_REPLY = 0
+    proto = ICMP_PROTOCOL
+    ECHO_REQUEST = ECHO_REQUEST
+    ECHO_REPLY = ECHO_REPLY
 
 
 class ICMPv6:
     family = socket.AF_INET6
-    proto = socket.getprotobyname("ipv6-icmp")
-    ECHO_REQUEST = 128
-    ECHO_REPLY = 129
+    proto = ICMP_V6_PROTOCOL
+    ECHO_REQUEST = ECHO_V6_REQUEST
+    ECHO_REPLY = ECHO_V6_REPLY
 
 
 ERRORS = {
