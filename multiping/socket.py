@@ -51,7 +51,7 @@ getaddrinfo = functools.cache(socket.getaddrinfo)
 gethostbyname = functools.cache(socket.gethostbyname)
 
 
-def resolve_address(address: str, family: int = SENTINEL) -> list[str]:
+def resolve_addresses(address: str, family: int = SENTINEL) -> list[str]:
     """
                    AF_INET
     localhost -> 127.0.0.1
@@ -64,7 +64,7 @@ def resolve_address(address: str, family: int = SENTINEL) -> list[str]:
         Addr = ipaddress.IPv4Address if family == socket.AF_INET else ipaddress.IPv6Address
     try:
         Addr(address)
-        return address
+        return [address]
     except ValueError:
         pass
     kwargs = {}
@@ -72,15 +72,19 @@ def resolve_address(address: str, family: int = SENTINEL) -> list[str]:
         kwargs["family"] = family
     addresses = getaddrinfo(address, 0, **kwargs)
     sock_type = socket.SOCK_RAW if CAN_HAVE_IP_HEADER else socket.SOCK_DGRAM
-    return next(addr[4][0] for addr in addresses if addr[1] == sock_type)
+    return [addr[4][0] for addr in addresses if addr[1] == sock_type]
+
+
+def resolve_address(address: str, family: int = SENTINEL) -> list[str]:
+    return resolve_addresses(address, family)[0]
 
 
 @functools.cache
 def gethostbyaddr(address: str) -> str:
     try:
-        return socket.gethostbyaddr(address)
-    except socket.herror:
-        pass    
+        return socket.gethostbyaddr(address)[0]
+    except OSError:
+        pass
     return gethostbyname(address)
     
 

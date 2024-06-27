@@ -16,9 +16,9 @@ class Host:
         self.icmp_id = icmp_id
         self.timeout = timeout
         self.ip = gethostbyname(host)
-        self.ip_address = ipaddress.ip_address(self.ip)
-        self.resolved_host = gethostbyaddr(self.ip)[0]
-        family = socket.AF_INET if self.ip_address.version == 4 else socket.AF_INET6
+        self.resolved_host = gethostbyaddr(self.ip)
+        ip_address = ipaddress.ip_address(self.ip)
+        family = socket.AF_INET if ip_address.version == 4 else socket.AF_INET6
         self.socket = Socket(family)
 
     def send_one_ping(self, icmp_seq: int = 1):
@@ -49,7 +49,6 @@ class Host:
 
     def fill_response(self, response):
         response["host"] = self.host
-        response["ip_address"] = self.ip_address
         response["resolved_host"] = self.resolved_host
         return response
 

@@ -21,13 +21,7 @@ class Ping:
 
     def receive_one_ping(self, addresses: list[str], icmp_seq: int = 1, timeout=SENTINEL):
         ips = {resolve_address(address): address for address in addresses}
-        addrs, hosts = {}, {}
-        for ip in ips:
-            addrs[ip] = ipaddress.ip_address(ip)
-            try:
-                hosts[ip] = gethostbyaddr(ip)[0]
-            except OSError:
-                hosts[ip] = ip
+        hosts = {ip: gethostbyaddr(ip) for ip in ips}
 
         if timeout is SENTINEL:
             timeout = self.timeout
@@ -41,7 +35,6 @@ class Ping:
             ip = response["ip"]
             pending_ips.remove(ip)
             response["host"] = ips[ip]
-            response["ip_address"] = addrs[ip]
             response["resolved_host"] = hosts[ip]
             yield response
 
