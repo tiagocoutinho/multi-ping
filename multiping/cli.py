@@ -2,7 +2,7 @@ import argparse
 import ipaddress
 import logging
 
-from .socket import ping_many
+from .ping import ping_many
 from .tools import response_text
 
 
