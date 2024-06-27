@@ -2,7 +2,8 @@ import argparse
 import ipaddress
 import logging
 
-from .core import ping, host_from_ip
+from .socket import ping_many
+from .tools import response_text
 
 
 def addresses_args(text):
@@ -10,7 +11,7 @@ def addresses_args(text):
         return [str(addr) for addr in ipaddress.ip_network(text)]
     except ValueError:
         return [text]
-    
+
 
 def cmd_line_parser():
     parser = argparse.ArgumentParser()
@@ -53,15 +54,8 @@ def run(args=None):
     fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
     logging.basicConfig(level=args.log_level.upper(), format=fmt)
     addresses = [addr for addresses in args.addresses for addr in addresses]
-    
-    address = addresses[0]
-    for response in ping(address, timeout=args.timeout):
-        size = response["size"]
-        ip = response["ip"]
-        seq = response["sequence"]
-        t = response["time"] * 1000
-        resolved_host = host_from_ip(ip)
-        yield f"{size} bytes from {resolved_host} ({ip}): icmp_seq={seq} time={t:.1f}ms"
+    for response in ping_many(addresses, timeout=args.timeout):
+        yield response_text(response)
 
 
 def main(args=None):

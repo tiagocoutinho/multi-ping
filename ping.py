@@ -227,7 +227,6 @@ def resolved_from_address(address, sock_family, sock_type) -> Result:
 
 
 def send_to(sock, payload, address):
-    print(payload, len(payload), address)
     logging.debug("sending %d bytes to %s", len(payload), address[0])
     try:
         return Ok(sock.sendto(payload, address))
