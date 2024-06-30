@@ -2,7 +2,9 @@ import argparse
 import ipaddress
 import logging
 
-from .ping import ping_many
+from .ping import ping_many, async_ping_many
+
+# from .host import ping_many
 from .tools import response_text
 
 
@@ -49,10 +51,14 @@ def parse_cmd_line_args(args=None):
     return parser.parse_args(args)
 
 
+def init_logging(level: str):
+    fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
+    logging.basicConfig(level=level.upper(), format=fmt)
+
+
 def run(args=None):
     args = parse_cmd_line_args(args)
-    fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
-    logging.basicConfig(level=args.log_level.upper(), format=fmt)
+    init_logging(args.log_level)
     addresses = [addr for addresses in args.addresses for addr in addresses]
     for response in ping_many(addresses, timeout=args.timeout):
         yield response_text(response)
@@ -66,5 +72,23 @@ def main(args=None):
         print()
 
 
+async def async_run(args=None):
+    args = parse_cmd_line_args(args)
+    init_logging(args.log_level)
+    addresses = [addr for addresses in args.addresses for addr in addresses]
+    async for response in async_ping_many(addresses, timeout=args.timeout):
+        yield response_text(response)
+
+
+async def async_main(args=None):
+    try:
+        async for message in async_run(args):
+            print(message)
+    except KeyboardInterrupt:
+        print()
+
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(async_main())

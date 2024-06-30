@@ -1,5 +1,4 @@
 import functools
-import ipaddress
 import select
 import socket
 import time
@@ -76,6 +75,39 @@ def address_info(host_or_ip: str):
         try:
             host = gethostbyaddr(ip)
         except OSError:
+            pass
+    return {
+        "input": host_or_ip,
+        "host": host,
+        "ip": ip,
+    }
+
+
+@functools.cache
+def resolver():
+    import aiodns
+
+    return aiodns.DNSResolver()
+
+
+async def async_gethostbyname(host_or_ip: str, family=socket.AF_INET):
+    return await resolver().gethostbyname(host_or_ip, family)
+
+
+async def async_gethostbyaddr(ip: str):
+    return await resolver().gethostbyaddr(ip)
+
+
+async def async_address_info(host_or_ip: str):
+    ip = (await async_gethostbyname(host_or_ip)).addresses[0]
+
+    is_ip = ip == host_or_ip
+
+    host = host_or_ip
+    if is_ip:
+        try:
+            host = (await async_gethostbyaddr(ip)).name
+        except Exception:
             pass
     return {
         "input": host_or_ip,
