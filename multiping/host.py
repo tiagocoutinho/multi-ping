@@ -16,7 +16,10 @@ class Host:
         self.icmp_id = icmp_id
         self.timeout = timeout
         self.ip = gethostbyname(host)
-        self.resolved_host = gethostbyaddr(self.ip)
+        try:
+            self.resolved_host = gethostbyaddr(self.ip)[0]
+        except OSError:
+            self.resolved_host = host
         ip_address = ipaddress.ip_address(self.ip)
         family = socket.AF_INET if ip_address.version == 4 else socket.AF_INET6
         self.socket = Socket(family)
@@ -83,7 +86,7 @@ def one_ping_many(
     hosts: list[str],
     icmp_id: int | None = None,
     icmp_seq: int = 1,
-    timeout: float | None = 1
+    timeout: float | None = 1,
 ):
     hosts = [Host(host, icmp_id, timeout) for host in hosts]
     yield from _one_ping_many(hosts, icmp_seq, timeout)

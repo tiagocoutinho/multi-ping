@@ -16,9 +16,13 @@ def cycle(start: int = 1, stop: int = 2**16, step: int = 1):
 
 
 def response_text(response):
-    size = response["size"]
     ip = response["ip"]
+    host = response["host"]
+    error = response.get("error", SENTINEL)
+    if error is not SENTINEL:
+        return f"{host} ({ip}): {error!r}"
+    size = response["size"]
     seq = response["sequence"]
     t = response["time"] * 1000
-    resolved_host = response["resolved_host"]
-    return f"{size} bytes from {resolved_host} ({ip}): icmp_seq={seq} time={t:.1f}ms"
+
+    return f"{size} bytes from {host} ({ip}): icmp_seq={seq} time={t:.1f}ms"

@@ -4,7 +4,14 @@ import select
 import socket
 import time
 
-from .protocol import ICMP_DEFAULT_SIZE, IP_HEADER, encode_request, decode_response, ICMPv4, ICMPv6
+from .protocol import (
+    ICMP_DEFAULT_SIZE,
+    IP_HEADER,
+    encode_request,
+    decode_response,
+    ICMPv4,
+    ICMPv6,
+)
 from .tools import SENTINEL
 
 
@@ -14,6 +21,7 @@ def _can_have_ip_header():
     except PermissionError:
         return False
     return True
+
 
 # No IP Header when unpriviledged on Linux
 CAN_HAVE_IP_HEADER = _can_have_ip_header()
@@ -35,7 +43,12 @@ def socket_request_type(sock: socket.socket):
     return ICMPv4.ECHO_REQUEST if sock.family == socket.AF_INET else ICMPv6.ECHO_REQUEST
 
 
-def socket_encode_request(sock: socket.socket, icmp_id: int = 1, icmp_seq: int = 1, timestamp: float | None = None) -> bytes:
+def socket_encode_request(
+    sock: socket.socket,
+    icmp_id: int = 1,
+    icmp_seq: int = 1,
+    timestamp: float | None = None,
+) -> bytes:
     request = socket_request_type(sock)
     return encode_request(request, icmp_id, icmp_seq, timestamp)
 
@@ -49,52 +62,35 @@ def socket_decode_response(sock: socket.socket, payload: bytes) -> dict:
 
 getaddrinfo = functools.cache(socket.getaddrinfo)
 gethostbyname = functools.cache(socket.gethostbyname)
+gethostbyname_ex = functools.cache(socket.gethostbyname_ex)
+gethostbyaddr = functools.cache(socket.gethostbyaddr)
 
 
-def resolve_addresses(address: str, family: int = SENTINEL) -> list[str]:
-    """
-                   AF_INET
-    localhost -> 127.0.0.1
-    127.0.0.1 -> 127.0.0.1
-    gnu.org   -> 209.51.188.116
-    ::1       -> ::1
-    """
-    Addr = ipaddress.ip_address
-    if family is not SENTINEL:
-        Addr = ipaddress.IPv4Address if family == socket.AF_INET else ipaddress.IPv6Address
-    try:
-        Addr(address)
-        return [address]
-    except ValueError:
-        pass
-    kwargs = {}
-    if family is not SENTINEL:
-        kwargs["family"] = family
-    addresses = getaddrinfo(address, 0, **kwargs)
-    sock_type = socket.SOCK_RAW if CAN_HAVE_IP_HEADER else socket.SOCK_DGRAM
-    return [addr[4][0] for addr in addresses if addr[1] == sock_type]
+def address_info(host_or_ip: str):
+    ip = gethostbyname(host_or_ip)
 
+    is_ip = ip == host_or_ip
 
-def resolve_address(address: str, family: int = SENTINEL) -> list[str]:
-    return resolve_addresses(address, family)[0]
+    host = host_or_ip
+    if is_ip:
+        try:
+            host = gethostbyaddr(ip)
+        except OSError:
+            pass
+    return {
+        "input": host_or_ip,
+        "host": host,
+        "ip": ip,
+    }
 
-
-@functools.cache
-def gethostbyaddr(address: str) -> str:
-    try:
-        return socket.gethostbyaddr(address)[0]
-    except OSError:
-        pass
-    return gethostbyname(address)
-    
 
 def socket_wait_response(sock: socket.socket, timeout: float | None = None):
     r, _, _ = select.select((sock,), (), (), timeout)
     if not r:
-        raise TimeoutError(f"read timeout after {timeout:.3f}s")
+        raise TimeoutError("timed out")
 
 
-def sockets_wait_response(socks, timeout = None):
+def sockets_wait_response(socks, timeout=None):
     socks = set(socks)
     if timeout is None:
         while socks:
@@ -126,7 +122,9 @@ def socket_send_one_ping_payload(sock: socket.socket, ip: str, payload: bytes):
     assert n == len(payload)
 
 
-def socket_send_one_ping(sock: socket.socket, ips: list[str], icmp_id: int, icmp_seq: int = 1):
+def socket_send_one_ping(
+    sock: socket.socket, ips: list[str], icmp_id: int, icmp_seq: int = 1
+):
     payload = socket_encode_request(sock, icmp_id, icmp_seq)
     for ip in ips:
         socket_send_one_ping_payload(sock, ip, payload)
@@ -175,3 +173,4 @@ class Socket(socket.socket):
     send_one_ping = socket_send_one_ping
     receive_one_ping = socket_receive_one_ping
     read_one_ping = socket_read_one_ping
+    wait_response = socket_wait_response
