@@ -2,7 +2,7 @@ import argparse
 import ipaddress
 import logging
 
-from .ping import ping_many, async_ping_many
+from .ping import ping, async_ping
 
 # from .host import ping_many
 from .tools import response_text
@@ -56,11 +56,16 @@ def init_logging(level: str):
     logging.basicConfig(level=level.upper(), format=fmt)
 
 
-def run(args=None):
+def init(args=None):
     args = parse_cmd_line_args(args)
     init_logging(args.log_level)
     addresses = [addr for addresses in args.addresses for addr in addresses]
-    for response in ping_many(addresses, timeout=args.timeout):
+    return args, addresses
+
+
+def run(args=None):
+    args, addresses = init(args)
+    for response in ping(addresses, timeout=args.timeout):
         yield response_text(response)
 
 
@@ -73,10 +78,8 @@ def main(args=None):
 
 
 async def async_run(args=None):
-    args = parse_cmd_line_args(args)
-    init_logging(args.log_level)
-    addresses = [addr for addresses in args.addresses for addr in addresses]
-    async for response in async_ping_many(addresses, timeout=args.timeout):
+    args, addresses = init(args)
+    async for response in async_ping(addresses, timeout=args.timeout):
         yield response_text(response)
 
 

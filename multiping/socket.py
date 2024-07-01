@@ -1,4 +1,5 @@
 import functools
+import logging
 import select
 import socket
 import time
@@ -65,7 +66,9 @@ gethostbyname_ex = functools.cache(socket.gethostbyname_ex)
 gethostbyaddr = functools.cache(socket.gethostbyaddr)
 
 
+@functools.cache
 def address_info(host_or_ip: str):
+    logging.info("Resolving %s...", host_or_ip)
     ip = gethostbyname(host_or_ip)
 
     is_ip = ip == host_or_ip
@@ -76,11 +79,8 @@ def address_info(host_or_ip: str):
             host = gethostbyaddr(ip)
         except OSError:
             pass
-    return {
-        "input": host_or_ip,
-        "host": host,
-        "ip": ip,
-    }
+    logging.info("Resolved %s to (%s %s)...", host_or_ip, host, ip)
+    return {"host": host, "ip": ip}
 
 
 @functools.cache
@@ -99,6 +99,7 @@ async def async_gethostbyaddr(ip: str):
 
 
 async def async_address_info(host_or_ip: str):
+    logging.info("Resolving %s...", host_or_ip)
     ip = (await async_gethostbyname(host_or_ip)).addresses[0]
 
     is_ip = ip == host_or_ip
@@ -109,17 +110,16 @@ async def async_address_info(host_or_ip: str):
             host = (await async_gethostbyaddr(ip)).name
         except Exception:
             pass
-    return {
-        "input": host_or_ip,
-        "host": host,
-        "ip": ip,
-    }
+    logging.info("Resolved %s to (%s %s)...", host_or_ip, host, ip)
+    return {"host": host, "ip": ip}
 
 
 def socket_wait_response(sock: socket.socket, timeout: float | None = None):
+    logging.debug("waiting for reply...")
     r, _, _ = select.select((sock,), (), (), timeout)
     if not r:
         raise TimeoutError("timed out")
+    logging.debug("received reply")
 
 
 def sockets_wait_response(socks, timeout=None):
@@ -159,6 +159,7 @@ def socket_send_one_ping(
 ):
     payload = socket_encode_request(sock, icmp_id, icmp_seq)
     for ip in ips:
+        logging.info("sending ping to %s...", ip)
         socket_send_one_ping_payload(sock, ip, payload)
 
 
@@ -174,6 +175,7 @@ def socket_read_one_ping(sock: socket.socket):
     response["time_received"] = time_received
     response["ip"] = address[0]
     response["time"] = time_received - response["time_sent"]
+    logging.info("read one ping from %s (seq=%s)...", address[0], response["sequence"])
     return response
 
 
