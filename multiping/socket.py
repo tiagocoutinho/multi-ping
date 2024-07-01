@@ -141,6 +141,7 @@ async def async_resolve_addresses(addresses):
             errors[address] = f"[{error.args[0]}]: {error.args[1]}"
         except Exception as error:
             errors[address] = str(error)
+
     async with asyncio.TaskGroup() as tg:
         _ = [tg.create_task(resolve(address)) for address in addresses]
     return addr_map, errors

@@ -2,7 +2,8 @@ import argparse
 import ipaddress
 import logging
 
-from .ping import ping, async_ping
+from .ping import ping
+from .aioping import async_ping
 
 # from .host import ping_many
 from .tools import response_text
@@ -79,7 +80,9 @@ def main(args=None):
 
 async def async_run(args=None):
     args, addresses = init(args)
-    async for response in async_ping(addresses, timeout=args.timeout):
+    async for response in async_ping(
+        addresses, interval=args.interval, count=args.count, timeout=args.timeout
+    ):
         yield response_text(response)
 
 

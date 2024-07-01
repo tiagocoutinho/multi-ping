@@ -4,7 +4,7 @@ import contextlib
 import logging
 import time
 
-from .socket import resolve_addresses, async_resolve_addresses, Socket
+from .socket import resolve_addresses, Socket
 from .tools import cycle, new_id, SENTINEL
 
 
@@ -46,33 +46,6 @@ def receive_one_ping(sock, ips, icmp_seq, timeout):
             return
         pending_ips.remove(response["ip"])
         yield response
-
-
-async def async_receive_one_ping(sock, ips, icmp_seq, timeout):
-    def cb():
-        response = sock.read_one_ping()
-        if response["sequence"] != icmp_seq:
-            return
-        pending_ips.remove(response["ip"])
-        responses.put_nowait(response)
-        if not pending_ips:
-            responses.put_nowait(None)
-
-    pending_ips = set(ips)
-    loop = asyncio.get_event_loop()
-    responses = asyncio.Queue()
-    loop.add_reader(sock, cb)
-    try:
-        async with asyncio.timeout(timeout):
-            while True:
-                if (response := await responses.get()) is None:
-                    break
-                yield response
-    except TimeoutError as error:
-        for ip in pending_ips:
-            yield {"ip": ip, "error": error}
-    finally:
-        loop.remove_reader(sock)
 
 
 class Ping:
@@ -130,52 +103,6 @@ class Ping:
                     yield result
             time.sleep(interval)
 
-    def async_receive_one_ping(
-        self, ips: list[str], icmp_seq: int = 1, timeout=SENTINEL
-    ):
-        if timeout is SENTINEL:
-            timeout = self.timeout
-        return async_receive_one_ping(self.socket, ips, icmp_seq, timeout)
-
-    def _async_one_ping(self, ips: list[str], icmp_seq, timeout):
-        self.send_one_ping(ips, icmp_seq)
-        return self.async_receive_one_ping(ips, icmp_seq, timeout)
-
-    async def async_one_ping(
-        self, addresses: list[str], icmp_seq: int = 1, timeout=SENTINEL
-    ):
-        addr_map, errors = await async_resolve_addresses(addresses)
-        for addr, error in errors.items():
-            yield dict(ip=addr, host=addr, error=error)
-        ips = set(addr_map)
-        async for result in self._async_one_ping(ips, icmp_seq, timeout):
-            ip = result["ip"]
-            for info in addr_map[ip]:
-                result["host"] = info["host"]
-                yield result
-
-    async def async_ping(
-        self,
-        addresses: list[str],
-        interval: float = 1,
-        count: int | None = None,
-        timeout=SENTINEL,
-    ):
-        if timeout is SENTINEL:
-            timeout = self.timeout
-        addr_map, errors = await async_resolve_addresses(addresses)
-        for addr, error in errors.items():
-            yield dict(ip=addr, host=addr, error=error)
-        ips = set(addr_map)
-        sequence = range(1, count + 1) if count else cycle()
-        for seq_id in sequence:
-            async for result in self._async_one_ping(ips, seq_id, timeout):
-                ip = result["ip"]
-                for info in addr_map[ip]:
-                    result["host"] = info["host"]
-                    yield result
-            await asyncio.sleep(interval)
-
 
 def ping(
     hosts: list[str],
@@ -187,16 +114,3 @@ def ping(
     sock = Socket()
     ping = Ping(sock, icmp_id, timeout)
     yield from ping.ping(hosts, interval, count)
-
-
-async def async_ping(
-    hosts: list[str],
-    icmp_id: int | None = None,
-    interval: float = 1,
-    count: int | None = None,
-    timeout: float | None = 1,
-):
-    sock = Socket()
-    ping = Ping(sock, icmp_id, timeout)
-    async for response in ping.async_ping(hosts, interval, count):
-        yield response
