@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from .socket import async_resolve_addresses, Socket
 from .tools import cycle, new_id, SENTINEL
@@ -59,6 +60,7 @@ class AsyncPing:
         self,
         addresses: list[str],
         interval: float = 1,
+        strict_interval: bool = False,
         count: int | None = None,
         timeout=SENTINEL,
     ):
@@ -70,12 +72,15 @@ class AsyncPing:
         ips = set(addr_map)
         sequence = range(1, count + 1) if count else cycle()
         for seq_id in sequence:
+            start = time.perf_counter()
             async for result in self._async_one_ping(ips, seq_id, timeout):
                 ip = result["ip"]
                 for info in addr_map[ip]:
                     result["host"] = info["host"]
                     yield result
-            await asyncio.sleep(interval)
+            dt = time.perf_counter() - start
+            nap = (interval - dt) if strict_interval else interval
+            await asyncio.sleep(nap)
 
 
 async def async_ping(
@@ -87,5 +92,5 @@ async def async_ping(
 ):
     sock = Socket()
     ping = AsyncPing(sock, icmp_id, timeout)
-    async for response in ping.async_ping(hosts, interval, count):
+    async for response in ping.async_ping(hosts, interval, True, count):
         yield response
