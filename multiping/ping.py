@@ -4,7 +4,7 @@ import contextlib
 import logging
 import time
 
-from .socket import address_info, async_address_info, Socket
+from .socket import resolve_addresses, async_resolve_addresses, Socket
 from .tools import cycle, new_id, SENTINEL
 
 
@@ -73,36 +73,6 @@ async def async_receive_one_ping(sock, ips, icmp_seq, timeout):
             yield {"ip": ip, "error": error}
     finally:
         loop.remove_reader(sock)
-
-
-def resolve_addresses(addresses):
-    addr_map, errors = {}, {}
-    for address in addresses:
-        try:
-            info = address_info(address)
-            addr_map.setdefault(info["ip"], []).append(info)
-        except OSError as error:
-            errors[address] = error
-    return addr_map, errors
-
-
-async def async_resolve_addresses(addresses):
-    addr_map, errors = {}, {}
-
-    async def raise_to_return(address):
-        try:
-            return address, await async_address_info(address)
-        except Exception as error:
-            return address, error
-
-    coros = [raise_to_return(address) for address in addresses]
-    for info in await asyncio.gather(*coros, return_exceptions=True):
-        addr, info = info
-        if isinstance(info, Exception):
-            errors[addr] = info
-        else:
-            addr_map.setdefault(info["ip"], []).append(info)
-    return addr_map, errors
 
 
 class Ping:

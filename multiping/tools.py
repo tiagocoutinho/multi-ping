@@ -20,7 +20,7 @@ def response_text(response):
     host = response["host"]
     error = response.get("error", SENTINEL)
     if error is not SENTINEL:
-        return f"{host} ({ip}): {error!r}"
+        return f"{host} ({ip}): {error}"
     size = response["size"]
     seq = response["sequence"]
     t = response["time"] * 1000

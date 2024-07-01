@@ -1,8 +1,15 @@
+import asyncio
 import functools
 import logging
 import select
 import socket
 import time
+
+try:
+    import aiodns
+except ModuleNotFoundError:
+    aiodns = None
+
 
 from .protocol import (
     ICMP_DEFAULT_SIZE,
@@ -85,8 +92,6 @@ def address_info(host_or_ip: str):
 
 @functools.cache
 def resolver():
-    import aiodns
-
     return aiodns.DNSResolver()
 
 
@@ -112,6 +117,33 @@ async def async_address_info(host_or_ip: str):
             pass
     logging.info("Resolved %s to (%s %s)...", host_or_ip, host, ip)
     return {"host": host, "ip": ip}
+
+
+def resolve_addresses(addresses):
+    addr_map, errors = {}, {}
+    for address in addresses:
+        try:
+            info = address_info(address)
+            addr_map.setdefault(info["ip"], []).append(info)
+        except OSError as error:
+            errors[address] = f"[{error.errno}]: {error.strerror}"
+    return addr_map, errors
+
+
+async def async_resolve_addresses(addresses):
+    addr_map, errors = {}, {}
+
+    async def resolve(address):
+        try:
+            info = await async_address_info(address)
+            addr_map.setdefault(info["ip"], []).append(info)
+        except aiodns.error.DNSError as error:
+            errors[address] = f"[{error.args[0]}]: {error.args[1]}"
+        except Exception as error:
+            errors[address] = str(error)
+    async with asyncio.TaskGroup() as tg:
+        _ = [tg.create_task(resolve(address)) for address in addresses]
+    return addr_map, errors
 
 
 def socket_wait_response(sock: socket.socket, timeout: float | None = None):
