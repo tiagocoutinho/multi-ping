@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import ipaddress
 import logging
 
@@ -26,6 +27,11 @@ def cmd_line_parser():
         default=1,
     )
     parser.add_argument(
+        "--strict-interval",
+        help="interpret interval as a period and make sure a ping is launched every period compensating for any drift",
+        action='store_true',
+    )
+    parser.add_argument(
         "-w",
         "--timeout",
         type=float,
@@ -40,6 +46,11 @@ def cmd_line_parser():
         choices=["debug", "info", "warn", "error"],
         help="log level",
         default="warn",
+    )
+    parser.add_argument(
+        "--async",
+        help="use asyncio",
+        action='store_true',
     )
     parser.add_argument(
         "addresses", type=addresses_args, nargs="+", help="host names, IPs or networks"
@@ -64,37 +75,33 @@ def init(args=None):
     return args, addresses
 
 
-def run(args=None):
-    args, addresses = init(args)
-    for response in ping(addresses, timeout=args.timeout):
-        yield response_text(response)
+async def async_run(addresses, **kwargs):
+    try:
+        async for response in async_ping(addresses, **kwargs):
+            print(response_text(response))
+    except (asyncio.exceptions.CancelledError):
+        print()
+
+
+def run(addresses, **kwargs):
+    try:
+        for response in ping(addresses, **kwargs):
+            print(response_text(response))
+    except KeyboardInterrupt:
+        print()
 
 
 def main(args=None):
-    try:
-        for message in run(args):
-            print(message)
-    except KeyboardInterrupt:
-        print()
-
-
-async def async_run(args=None):
     args, addresses = init(args)
-    async for response in async_ping(
-        addresses, interval=args.interval, count=args.count, timeout=args.timeout
-    ):
-        yield response_text(response)
-
-
-async def async_main(args=None):
-    try:
-        async for message in async_run(args):
-            print(message)
-    except KeyboardInterrupt:
-        print()
+    kwargs = vars(args)
+    del kwargs["log_level"]
+    del kwargs["addresses"]
+    use_async = kwargs.pop("async")
+    if use_async:
+        asyncio.run(async_run(addresses, **kwargs))
+    else:
+        run(addresses, **kwargs)
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(async_main())
+    main()

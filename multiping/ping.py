@@ -85,6 +85,7 @@ class Ping:
         self,
         addresses: list[str],
         interval: float = 1,
+        strict_interval: bool = False,
         count: int | None = None,
         timeout=SENTINEL,
     ):
@@ -96,21 +97,26 @@ class Ping:
         ips = set(addr_map)
         sequence = range(1, count + 1) if count else cycle()
         for seq_id in sequence:
+            start = time.perf_counter()
             for result in self._one_ping(ips, seq_id, timeout):
                 ip = result["ip"]
                 for info in addr_map[ip]:
                     result["host"] = info["host"]
                     yield result
-            time.sleep(interval)
+            dt = time.perf_counter() - start
+            nap = (interval - dt) if strict_interval else interval
+            if nap > 0:
+                time.sleep(nap)
 
 
 def ping(
     hosts: list[str],
     icmp_id: int | None = None,
     interval: float = 1,
+    strict_interval: bool = False,
     count: int | None = None,
     timeout: float | None = 1,
 ):
     sock = Socket()
     ping = Ping(sock, icmp_id, timeout)
-    yield from ping.ping(hosts, interval, count)
+    yield from ping.ping(hosts, interval, strict_interval, count)

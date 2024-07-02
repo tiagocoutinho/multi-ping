@@ -76,21 +76,22 @@ class AsyncPing:
             async for result in self._async_one_ping(ips, seq_id, timeout):
                 ip = result["ip"]
                 for info in addr_map[ip]:
-                    result["host"] = info["host"]
-                    yield result
+                    yield dict(result, host=info["host"])
             dt = time.perf_counter() - start
             nap = (interval - dt) if strict_interval else interval
-            await asyncio.sleep(nap)
+            if nap > 0:
+                await asyncio.sleep(nap)
 
 
 async def async_ping(
     hosts: list[str],
     icmp_id: int | None = None,
     interval: float = 1,
+    strict_interval: bool = False,
     count: int | None = None,
     timeout: float | None = 1,
 ):
     sock = Socket()
     ping = AsyncPing(sock, icmp_id, timeout)
-    async for response in ping.async_ping(hosts, interval, True, count):
+    async for response in ping.async_ping(hosts, interval, strict_interval, count):
         yield response
