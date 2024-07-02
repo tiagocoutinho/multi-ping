@@ -1,5 +1,3 @@
-import asyncio
-import asyncio.queues
 import contextlib
 import logging
 import time

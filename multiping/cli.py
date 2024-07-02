@@ -3,8 +3,7 @@ import asyncio
 import ipaddress
 import logging
 
-from .ping import ping
-from .aioping import async_ping
+from . import aioping, ping, tools
 
 # from .host import ping_many
 from .tools import response_text
@@ -29,7 +28,7 @@ def cmd_line_parser():
     parser.add_argument(
         "--strict-interval",
         help="interpret interval as a period and make sure a ping is launched every period compensating for any drift",
-        action='store_true',
+        action="store_true",
     )
     parser.add_argument(
         "-w",
@@ -50,7 +49,7 @@ def cmd_line_parser():
     parser.add_argument(
         "--async",
         help="use asyncio",
-        action='store_true',
+        action="store_true",
     )
     parser.add_argument(
         "addresses", type=addresses_args, nargs="+", help="host names, IPs or networks"
@@ -76,19 +75,27 @@ def init(args=None):
 
 
 async def async_run(addresses, **kwargs):
+    stream = aioping.ping(addresses, **kwargs)
+    stats = tools.PingStats(stream)
     try:
-        async for response in async_ping(addresses, **kwargs):
+        async for response in stats:
             print(response_text(response))
-    except (asyncio.exceptions.CancelledError):
+    except asyncio.exceptions.CancelledError:
         print()
+    finally:
+        print(stats)
 
 
 def run(addresses, **kwargs):
+    stream = ping.ping(addresses, **kwargs)
+    stats = tools.PingStats(stream)
     try:
-        for response in ping(addresses, **kwargs):
+        for response in stats:
             print(response_text(response))
     except KeyboardInterrupt:
         print()
+    finally:
+        print(stats)
 
 
 def main(args=None):
