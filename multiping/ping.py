@@ -79,6 +79,25 @@ class Ping:
                 result["host"] = info["host"]
                 yield result
 
+    def raw_ping(
+        self,
+        ips: list[str],
+        interval: float = 1,
+        strict_interval: bool = False,
+        count: int | None = None,
+        timeout=SENTINEL,
+    ):
+        if timeout is SENTINEL:
+            timeout = self.timeout
+        sequence = range(1, count + 1) if count else cycle()
+        for seq_id in sequence:
+            start = time.perf_counter()
+            yield from self._one_ping(ips, seq_id, timeout)
+            dt = time.perf_counter() - start
+            nap = (interval - dt) if strict_interval else interval
+            if nap > 0:
+                time.sleep(nap)
+
     def ping(
         self,
         addresses: list[str],
@@ -93,18 +112,11 @@ class Ping:
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)
         ips = set(addr_map)
-        sequence = range(1, count + 1) if count else cycle()
-        for seq_id in sequence:
-            start = time.perf_counter()
-            for result in self._one_ping(ips, seq_id, timeout):
-                ip = result["ip"]
-                for info in addr_map[ip]:
-                    result["host"] = info["host"]
-                    yield result
-            dt = time.perf_counter() - start
-            nap = (interval - dt) if strict_interval else interval
-            if nap > 0:
-                time.sleep(nap)
+        for result in self.raw_ping(ips, interval, strict_interval, count, timeout):
+            ip = result["ip"]
+            for info in addr_map[ip]:
+                result["host"] = info["host"]
+                yield result
 
 
 def ping(

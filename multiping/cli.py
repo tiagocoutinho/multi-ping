@@ -62,14 +62,10 @@ def parse_cmd_line_args(args=None):
     return parser.parse_args(args)
 
 
-def init_logging(level: str):
-    fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
-    logging.basicConfig(level=level.upper(), format=fmt)
-
-
 def init(args=None):
     args = parse_cmd_line_args(args)
-    init_logging(args.log_level)
+    fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
+    logging.basicConfig(level=args.log_level.upper(), format=fmt)
     addresses = [addr for addresses in args.addresses for addr in addresses]
     return args, addresses
 
