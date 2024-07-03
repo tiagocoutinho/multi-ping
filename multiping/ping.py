@@ -3,7 +3,7 @@ import logging
 import time
 
 from .socket import resolve_addresses, Socket
-from .tools import cycle, new_id, SENTINEL
+from .tools import cycle, new_id, rate_limit, SENTINEL
 
 
 @contextlib.contextmanager
@@ -90,13 +90,8 @@ class Ping:
         if timeout is SENTINEL:
             timeout = self.timeout
         sequence = range(1, count + 1) if count else cycle()
-        for seq_id in sequence:
-            start = time.perf_counter()
+        for seq_id in rate_limit(sequence, interval, strict_interval):
             yield from self._one_ping(ips, seq_id, timeout)
-            dt = time.perf_counter() - start
-            nap = (interval - dt) if strict_interval else interval
-            if nap > 0:
-                time.sleep(nap)
 
     def ping(
         self,
@@ -106,8 +101,6 @@ class Ping:
         count: int | None = None,
         timeout=SENTINEL,
     ):
-        if timeout is SENTINEL:
-            timeout = self.timeout
         addr_map, errors = resolve_addresses(addresses)
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)

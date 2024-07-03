@@ -1,3 +1,6 @@
+import asyncio
+import inspect
+import time
 import uuid
 
 
@@ -109,3 +112,23 @@ class PingStats:
 
     def __str__(self):
         return "\n".join(str(stats) for stats in self.stats.values() if stats.ok)
+
+
+def rate_limit(stream, interval: float, strict: bool = False):
+    for result in stream:
+        start = time.perf_counter()
+        yield result
+        dt = time.perf_counter() - start
+        nap = (interval - dt) if strict else interval
+        if nap > 0:
+            time.sleep(nap)
+
+
+async def async_rate_limit(stream, interval: float, strict: bool = False):
+    for result in stream:
+        start = time.perf_counter()
+        yield result
+        dt = time.perf_counter() - start
+        nap = (interval - dt) if strict else interval
+        if nap > 0:
+            await asyncio.sleep(nap)
