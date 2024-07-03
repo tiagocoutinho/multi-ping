@@ -1,11 +1,14 @@
 import asyncio
-import time
+
+from collections.abc import Iterable, AsyncIterable
 
 from .socket import async_resolve_addresses, Socket
 from .tools import cycle, new_id, async_rate_limit, SENTINEL
 
 
-async def receive_one_ping(sock, ips, icmp_seq, timeout):
+async def receive_one_ping(
+    sock: Socket, ips: Iterable[str], icmp_seq: int, timeout: float | None
+) -> AsyncIterable[dict]:
     def cb():
         response = sock.read_one_ping()
         if response["sequence"] != icmp_seq:
@@ -36,19 +39,21 @@ async def receive_one_ping(sock, ips, icmp_seq, timeout):
 class AsyncPing:
     """Handle several hosts with a single "shared" ICMP socket"""
 
-    def __init__(self, sock: Socket, icmp_id=None, timeout=None):
+    def __init__(
+        self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None
+    ):
         self.socket = sock
         if icmp_id is None:
             icmp_id = new_id()
         self.icmp_id = icmp_id
         self.timeout = timeout
 
-    def send_one_ping(self, ips: list[str], icmp_seq: int = 1):
+    def send_one_ping(self, ips: Iterable[str], icmp_seq: int = 1):
         self.socket.send_one_ping(ips, self.icmp_id, icmp_seq)
 
     async def receive_one_ping(
-        self, ips: list[str], icmp_seq: int = 1, timeout=SENTINEL
-    ):
+        self, ips: Iterable[str], icmp_seq: int = 1, timeout: float | None = SENTINEL
+    ) -> dict:
         if timeout is SENTINEL:
             timeout = self.timeout
         return await receive_one_ping(self.socket, ips, icmp_seq, timeout)
@@ -59,11 +64,11 @@ class AsyncPing:
 
     async def raw_ping(
         self,
-        ips: list[str],
+        ips: Iterable[str],
         interval: float = 1,
         strict_interval: bool = False,
         count: int | None = None,
-        timeout=SENTINEL,
+        timeout: float | None = SENTINEL,
     ):
         if timeout is SENTINEL:
             timeout = self.timeout
@@ -74,11 +79,11 @@ class AsyncPing:
 
     async def ping(
         self,
-        addresses: list[str],
+        addresses: Iterable[str],
         interval: float = 1,
         strict_interval: bool = False,
         count: int | None = None,
-        timeout=SENTINEL,
+        timeout: float | None = SENTINEL,
     ):
         addr_map, errors = await async_resolve_addresses(addresses)
         for addr, error in errors.items():
@@ -92,7 +97,7 @@ class AsyncPing:
 
 
 async def ping(
-    hosts: list[str],
+    hosts: Iterable[str],
     icmp_id: int | None = None,
     interval: float = 1,
     strict_interval: bool = False,

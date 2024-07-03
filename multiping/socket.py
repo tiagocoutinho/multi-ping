@@ -5,6 +5,8 @@ import select
 import socket
 import time
 
+from collections.abc import Iterable
+
 try:
     import aiodns
 except ModuleNotFoundError:
@@ -19,7 +21,6 @@ from .protocol import (
     ICMPv4,
     ICMPv6,
 )
-from .tools import SENTINEL
 
 
 def _can_have_ip_header():
@@ -46,7 +47,7 @@ def socket_port(sock: socket.socket) -> int:
     return sock.getsockname()[1]
 
 
-def socket_request_type(sock: socket.socket):
+def socket_request_type(sock: socket.socket) -> int:
     return ICMPv4.ECHO_REQUEST if sock.family == socket.AF_INET else ICMPv6.ECHO_REQUEST
 
 
@@ -74,7 +75,7 @@ gethostbyaddr = functools.cache(socket.gethostbyaddr)
 
 
 @functools.cache
-def address_info(host_or_ip: str):
+def address_info(host_or_ip: str) -> dict[str, str]:
     logging.info("Resolving %s...", host_or_ip)
     ip = gethostbyname(host_or_ip)
 
@@ -91,19 +92,19 @@ def address_info(host_or_ip: str):
 
 
 @functools.cache
-def resolver():
+def resolver() -> aiodns.DNSResolver:
     return aiodns.DNSResolver()
 
 
-async def async_gethostbyname(host_or_ip: str, family=socket.AF_INET):
+async def async_gethostbyname(host_or_ip: str, family=socket.AF_INET) -> str:
     return await resolver().gethostbyname(host_or_ip, family)
 
 
-async def async_gethostbyaddr(ip: str):
+async def async_gethostbyaddr(ip: str) -> str:
     return await resolver().gethostbyaddr(ip)
 
 
-async def async_address_info(host_or_ip: str):
+async def async_address_info(host_or_ip: str) -> dict[str, str]:
     logging.info("Resolving %s...", host_or_ip)
     ip = (await async_gethostbyname(host_or_ip)).addresses[0]
 
@@ -119,7 +120,9 @@ async def async_address_info(host_or_ip: str):
     return {"host": host, "ip": ip}
 
 
-def resolve_addresses(addresses):
+def resolve_addresses(
+    addresses: Iterable[str],
+) -> tuple[dict[str, str], dict[str, str]]:
     addr_map, errors = {}, {}
     for address in addresses:
         try:
@@ -130,7 +133,9 @@ def resolve_addresses(addresses):
     return addr_map, errors
 
 
-async def async_resolve_addresses(addresses):
+async def async_resolve_addresses(
+    addresses: Iterable[str],
+) -> tuple[dict[str, str], dict[str, str]]:
     addr_map, errors = {}, {}
 
     async def resolve(address):
@@ -196,7 +201,7 @@ def socket_send_one_ping(
         socket_send_one_ping_payload(sock, ip, payload)
 
 
-def socket_read_one_ping(sock: socket.socket):
+def socket_read_one_ping(sock: socket.socket) -> dict:
     ip_header = socket_has_ip_header(sock)
     size = ICMP_DEFAULT_SIZE + (IP_HEADER.size if ip_header else 0)
     payload, address = sock.recvfrom(size)
@@ -212,7 +217,7 @@ def socket_read_one_ping(sock: socket.socket):
     return response
 
 
-def socket_receive_one_ping(sock: socket.socket, timeout: float | None = None):
+def socket_receive_one_ping(sock: socket.socket, timeout: float | None = None) -> dict:
     socket_wait_response(sock, timeout)
     return socket_read_one_ping(sock)
 

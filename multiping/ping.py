@@ -2,12 +2,14 @@ import contextlib
 import logging
 import time
 
+from collections.abc import Callable, Iterable
+
 from .socket import resolve_addresses, Socket
 from .tools import cycle, new_id, rate_limit, SENTINEL
 
 
 @contextlib.contextmanager
-def remaining_time(timeout):
+def remaining_time(timeout) -> Iterable[Callable[[], float]]:
     if timeout is None:
         remaining = lambda: None
     else:
@@ -15,13 +17,15 @@ def remaining_time(timeout):
 
         def remaining():
             if (remain := timeout - time.perf_counter() + start) <= 0:
-                raise TimeoutError(f"timed out after {timeout}s")
+                raise TimeoutError()
             return remain
 
     yield remaining
 
 
-def receive_pings_for_sequence(sock, icmp_seq, timeout):
+def receive_pings_for_sequence(
+    sock: Socket, icmp_seq: int, timeout: float | None
+) -> Iterable[dict]:
     with remaining_time(timeout) as timer:
         while True:
             tout = timer()
@@ -32,7 +36,9 @@ def receive_pings_for_sequence(sock, icmp_seq, timeout):
             yield response
 
 
-def receive_one_ping(sock, ips, icmp_seq, timeout):
+def receive_one_ping(
+    sock: Socket, ips: Iterable[str], icmp_seq: int, timeout: float | None
+) -> Iterable[dict]:
     pending_ips = set(ips)
     responses = receive_pings_for_sequence(sock, icmp_seq, timeout)
     while pending_ips:
@@ -49,26 +55,34 @@ def receive_one_ping(sock, ips, icmp_seq, timeout):
 class Ping:
     """Handle several hosts with a single "shared" ICMP socket"""
 
-    def __init__(self, sock: Socket, icmp_id=None, timeout=None):
+    def __init__(
+        self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None
+    ):
         self.socket = sock
         if icmp_id is None:
             icmp_id = new_id()
         self.icmp_id = icmp_id
         self.timeout = timeout
 
-    def send_one_ping(self, ips: list[str], icmp_seq: int = 1):
+    def send_one_ping(self, ips: Iterable[str], icmp_seq: int = 1):
         self.socket.send_one_ping(ips, self.icmp_id, icmp_seq)
 
-    def receive_one_ping(self, ips: list[str], icmp_seq: int = 1, timeout=SENTINEL):
+    def receive_one_ping(
+        self, ips: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL
+    ) -> Iterable[dict]:
         if timeout is SENTINEL:
             timeout = self.timeout
         yield from receive_one_ping(self.socket, ips, icmp_seq, timeout)
 
-    def _one_ping(self, ips: list[str], icmp_seq: int, timeout: float | None):
+    def _one_ping(
+        self, ips: Iterable[str], icmp_seq: int, timeout: float | None
+    ) -> Iterable[dict]:
         self.send_one_ping(ips, icmp_seq)
         yield from self.receive_one_ping(ips, icmp_seq, timeout)
 
-    def one_ping(self, addresses: list[str], icmp_seq: int = 1, timeout=SENTINEL):
+    def one_ping(
+        self, addresses: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL
+    ) -> Iterable[dict]:
         addr_map, errors = resolve_addresses(addresses)
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)
@@ -81,12 +95,12 @@ class Ping:
 
     def raw_ping(
         self,
-        ips: list[str],
+        ips: Iterable[str],
         interval: float = 1,
         strict_interval: bool = False,
         count: int | None = None,
-        timeout=SENTINEL,
-    ):
+        timeout: float | None = SENTINEL,
+    ) -> Iterable[dict]:
         if timeout is SENTINEL:
             timeout = self.timeout
         sequence = range(1, count + 1) if count else cycle()
@@ -95,12 +109,12 @@ class Ping:
 
     def ping(
         self,
-        addresses: list[str],
+        addresses: Iterable[str],
         interval: float = 1,
         strict_interval: bool = False,
         count: int | None = None,
-        timeout=SENTINEL,
-    ):
+        timeout: float | None = SENTINEL,
+    ) -> Iterable[dict]:
         addr_map, errors = resolve_addresses(addresses)
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)
@@ -113,13 +127,13 @@ class Ping:
 
 
 def ping(
-    hosts: list[str],
+    hosts: Iterable[str],
     icmp_id: int | None = None,
     interval: float = 1,
     strict_interval: bool = False,
     count: int | None = None,
     timeout: float | None = 1,
-):
+) -> Iterable[dict]:
     sock = Socket()
     ping = Ping(sock, icmp_id, timeout)
     yield from ping.ping(hosts, interval, strict_interval, count)

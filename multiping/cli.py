@@ -3,6 +3,8 @@ import asyncio
 import ipaddress
 import logging
 
+from collections.abc import Iterable
+
 from . import aioping, ping, tools
 
 # from .host import ping_many
@@ -16,7 +18,7 @@ def addresses_args(text):
         return [text]
 
 
-def cmd_line_parser():
+def cmd_line_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
@@ -57,12 +59,12 @@ def cmd_line_parser():
     return parser
 
 
-def parse_cmd_line_args(args=None):
+def parse_cmd_line_args(args=None) -> argparse.Namespace:
     parser = cmd_line_parser()
     return parser.parse_args(args)
 
 
-def init(args=None):
+def init(args=None) -> tuple[argparse.Namespace, list[str]]:
     args = parse_cmd_line_args(args)
     fmt = "%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s"
     logging.basicConfig(level=args.log_level.upper(), format=fmt)
@@ -70,7 +72,7 @@ def init(args=None):
     return args, addresses
 
 
-async def async_run(addresses, **kwargs):
+async def async_run(addresses: Iterable[str], **kwargs):
     stream = aioping.ping(addresses, **kwargs)
     stats = tools.PingStats(stream)
     try:
@@ -82,7 +84,7 @@ async def async_run(addresses, **kwargs):
         print(stats)
 
 
-def run(addresses, **kwargs):
+def run(addresses: Iterable[str], **kwargs):
     stream = ping.ping(addresses, **kwargs)
     stats = tools.PingStats(stream)
     try:
