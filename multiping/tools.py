@@ -5,7 +5,6 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 import asyncio
-import inspect
 import time
 import uuid
 
