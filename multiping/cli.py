@@ -45,9 +45,7 @@ def cmd_line_parser() -> argparse.ArgumentParser:
         help="time to wait for response (seconds)",
         default=1,
     )
-    parser.add_argument(
-        "-c", "--count", type=int, help="stop after sending count pings", default=None
-    )
+    parser.add_argument("-c", "--count", type=int, help="stop after sending count pings", default=None)
     parser.add_argument(
         "--log-level",
         choices=["debug", "info", "warn", "error"],
@@ -59,9 +57,7 @@ def cmd_line_parser() -> argparse.ArgumentParser:
         help="use asyncio",
         action="store_true",
     )
-    parser.add_argument(
-        "addresses", type=addresses_args, nargs="+", help="host names, IPs or networks"
-    )
+    parser.add_argument("addresses", type=addresses_args, nargs="+", help="host names, IPs or networks")
     return parser
 
 

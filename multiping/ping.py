@@ -4,6 +4,21 @@
 # Copyright (c) 2024 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
+"""
+Synchronous multi-ping API.
+
+Here is an example using the functional API:
+
+```python
+from multiping.ping import ping
+from multiping.tools import response_text
+
+for response in ping(["gnu.org", "orcid.org"], count=4):
+    text = response_text(response)
+    print(text)
+```
+"""
+
 import contextlib
 import logging
 import time
@@ -11,7 +26,7 @@ import time
 from collections.abc import Callable, Iterable
 
 from .socket import resolve_addresses, Socket
-from .tools import cycle, new_id, rate_limit, SENTINEL
+from .tools import cycle, new_id, intervals, SENTINEL
 
 
 @contextlib.contextmanager
@@ -29,9 +44,7 @@ def remaining_time(timeout) -> Iterable[Callable[[], float]]:
     yield remaining
 
 
-def receive_pings_for_sequence(
-    sock: Socket, icmp_seq: int, timeout: float | None
-) -> Iterable[dict]:
+def receive_pings_for_sequence(sock: Socket, icmp_seq: int, timeout: float | None) -> Iterable[dict]:
     with remaining_time(timeout) as timer:
         while True:
             tout = timer()
@@ -42,9 +55,7 @@ def receive_pings_for_sequence(
             yield response
 
 
-def receive_one_ping(
-    sock: Socket, ips: Iterable[str], icmp_seq: int, timeout: float | None
-) -> Iterable[dict]:
+def receive_one_ping(sock: Socket, ips: Iterable[str], icmp_seq: int, timeout: float | None) -> Iterable[dict]:
     pending_ips = set(ips)
     responses = receive_pings_for_sequence(sock, icmp_seq, timeout)
     while pending_ips:
@@ -61,9 +72,7 @@ def receive_one_ping(
 class Ping:
     """Handle several hosts with a single "shared" ICMP socket"""
 
-    def __init__(
-        self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None
-    ):
+    def __init__(self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None):
         self.socket = sock
         if icmp_id is None:
             icmp_id = new_id()
@@ -73,22 +82,16 @@ class Ping:
     def send_one_ping(self, ips: Iterable[str], icmp_seq: int = 1):
         self.socket.send_one_ping(ips, self.icmp_id, icmp_seq)
 
-    def receive_one_ping(
-        self, ips: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL
-    ) -> Iterable[dict]:
+    def receive_one_ping(self, ips: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL) -> Iterable[dict]:
         if timeout is SENTINEL:
             timeout = self.timeout
         yield from receive_one_ping(self.socket, ips, icmp_seq, timeout)
 
-    def _one_ping(
-        self, ips: Iterable[str], icmp_seq: int, timeout: float | None
-    ) -> Iterable[dict]:
+    def _one_ping(self, ips: Iterable[str], icmp_seq: int, timeout: float | None) -> Iterable[dict]:
         self.send_one_ping(ips, icmp_seq)
         yield from self.receive_one_ping(ips, icmp_seq, timeout)
 
-    def one_ping(
-        self, addresses: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL
-    ) -> Iterable[dict]:
+    def one_ping(self, addresses: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL) -> Iterable[dict]:
         addr_map, errors = resolve_addresses(addresses)
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)
@@ -107,10 +110,12 @@ class Ping:
         count: int | None = None,
         timeout: float | None = SENTINEL,
     ) -> Iterable[dict]:
+        if not ips:
+            return
         if timeout is SENTINEL:
             timeout = self.timeout
         sequence = range(1, count + 1) if count else cycle()
-        for seq_id in rate_limit(sequence, interval, strict_interval):
+        for seq_id in intervals(sequence, interval, strict_interval):
             yield from self._one_ping(ips, seq_id, timeout)
 
     def ping(
@@ -140,6 +145,13 @@ def ping(
     count: int | None = None,
     timeout: float | None = 1,
 ) -> Iterable[dict]:
+    """
+    Ping group of given hosts concurrently *count* number of times separated by *interval (s)*
+
+    Infinine sequence of pings (default) is achieved with *count=None*
+
+    If *strict_interval* is True, a best effort is made to
+    """
     sock = Socket()
     ping = Ping(sock, icmp_id, timeout)
     yield from ping.ping(hosts, interval, strict_interval, count)

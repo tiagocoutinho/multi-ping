@@ -9,7 +9,7 @@ import asyncio
 from collections.abc import Iterable, AsyncIterable
 
 from .socket import async_resolve_addresses, Socket
-from .tools import cycle, new_id, async_rate_limit, SENTINEL
+from .tools import cycle, new_id, async_intervals, SENTINEL
 
 
 async def receive_one_ping(
@@ -45,9 +45,7 @@ async def receive_one_ping(
 class AsyncPing:
     """Handle several hosts with a single "shared" ICMP socket"""
 
-    def __init__(
-        self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None
-    ):
+    def __init__(self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None):
         self.socket = sock
         if icmp_id is None:
             icmp_id = new_id()
@@ -57,16 +55,16 @@ class AsyncPing:
     def send_one_ping(self, ips: Iterable[str], icmp_seq: int = 1):
         self.socket.send_one_ping(ips, self.icmp_id, icmp_seq)
 
-    async def receive_one_ping(
-        self, ips: Iterable[str], icmp_seq: int = 1, timeout: float | None = SENTINEL
-    ) -> dict:
+    async def receive_one_ping(self, ips: Iterable[str], icmp_seq: int = 1, timeout: float | None = SENTINEL) -> dict:
         if timeout is SENTINEL:
             timeout = self.timeout
-        return await receive_one_ping(self.socket, ips, icmp_seq, timeout)
+        async for result in receive_one_ping(self.socket, ips, icmp_seq, timeout):
+            yield result
 
     async def _one_ping(self, ips: list[str], icmp_seq, timeout):
         self.send_one_ping(ips, icmp_seq)
-        return await self.receive_one_ping(ips, icmp_seq, timeout)
+        async for result in self.receive_one_ping(ips, icmp_seq, timeout):
+            yield result
 
     async def raw_ping(
         self,
@@ -76,10 +74,12 @@ class AsyncPing:
         count: int | None = None,
         timeout: float | None = SENTINEL,
     ):
+        if not ips:
+            return
         if timeout is SENTINEL:
             timeout = self.timeout
         sequence = range(1, count + 1) if count else cycle()
-        async for seq_id in async_rate_limit(sequence, interval, strict_interval):
+        async for seq_id in async_intervals(sequence, interval, strict_interval):
             async for result in self._one_ping(ips, seq_id, timeout):
                 yield result
 
@@ -95,9 +95,7 @@ class AsyncPing:
         for addr, error in errors.items():
             yield dict(ip=addr, host=addr, error=error)
         ips = set(addr_map)
-        async for result in self.raw_ping(
-            ips, interval, strict_interval, count, timeout
-        ):
+        async for result in self.raw_ping(ips, interval, strict_interval, count, timeout):
             for info in addr_map[result["ip"]]:
                 yield dict(result, host=info["host"])
 

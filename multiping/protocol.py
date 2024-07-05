@@ -113,9 +113,7 @@ def encode_request(
 ) -> bytes:
     """Encode ping into bytes"""
     header = bytes(Header(request, ICMP_DEFAULT_CODE, 0, icmp_id, icmp_seq))
-    padding = (
-        ICMP_DEFAULT_SIZE - len(header) - TIME.size
-    ) * b"Q"  # Using double to store current time.
+    padding = (ICMP_DEFAULT_SIZE - len(header) - TIME.size) * b"Q"  # Using double to store current time.
     if timestamp is None:
         timestamp = time.perf_counter()
     payload = TIME.pack(timestamp) + padding

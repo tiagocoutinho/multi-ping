@@ -186,9 +186,7 @@ def sockets_wait_response(socks, timeout=None):
         socks -= set(r)
 
 
-def socket_recvfrom_timeout(
-    sock: socket.socket, size: int = 1024, timeout: float | None = None
-) -> bytes:
+def socket_recvfrom_timeout(sock: socket.socket, size: int = 1024, timeout: float | None = None) -> bytes:
     socket_wait_response(sock, timeout)
     return sock.recvfrom(size)
 
@@ -198,9 +196,7 @@ def socket_send_one_ping_payload(sock: socket.socket, ip: str, payload: bytes):
     assert n == len(payload)
 
 
-def socket_send_one_ping(
-    sock: socket.socket, ips: list[str], icmp_id: int, icmp_seq: int = 1
-):
+def socket_send_one_ping(sock: socket.socket, ips: list[str], icmp_id: int, icmp_seq: int = 1):
     payload = socket_encode_request(sock, icmp_id, icmp_seq)
     for ip in ips:
         logging.info("sending ping to %s...", ip)

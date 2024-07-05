@@ -33,7 +33,9 @@ def response_text(response):
     seq = response["sequence"]
     t = response["time"] * 1000
 
-    return f"{size} bytes from {host} ({ip}): icmp_seq={seq} time={t:.1f}ms"
+    ts = time.time()
+
+    return f"[{ts:.3f}] {size} bytes from {host} ({ip}): icmp_seq={seq} time={t:.1f}ms"
 
 
 STATS_TEMPLATE = """\
@@ -119,21 +121,27 @@ class PingStats:
         return "\n".join(str(stats) for stats in self.stats.values() if stats.ok)
 
 
-def rate_limit(stream, interval: float, strict: bool = False):
-    for result in stream:
+def intervals(stream, interval: float, strict: bool = False):
+    if strict:
         start = time.perf_counter()
-        yield result
-        dt = time.perf_counter() - start
-        nap = (interval - dt) if strict else interval
-        if nap > 0:
-            time.sleep(nap)
+        for i, result in enumerate(stream, start=1):
+            yield result
+            if (dt := i * interval + start - time.perf_counter()) > 0:
+                time.sleep(dt)
+    else:
+        for result in stream:
+            yield result
+            time.sleep(interval)
 
 
-async def async_rate_limit(stream, interval: float, strict: bool = False):
-    for result in stream:
+async def async_intervals(stream, interval: float, strict: bool = False):
+    if strict:
         start = time.perf_counter()
-        yield result
-        dt = time.perf_counter() - start
-        nap = (interval - dt) if strict else interval
-        if nap > 0:
-            await asyncio.sleep(nap)
+        for i, result in enumerate(stream, start=1):
+            yield result
+            if (dt := i * interval + start - time.perf_counter()) > 0:
+                await asyncio.sleep(dt)
+    else:
+        for result in stream:
+            yield result
+            await asyncio.sleep(interval)
