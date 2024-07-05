@@ -91,17 +91,6 @@ class Ping:
         self.send_one_ping(ips, icmp_seq)
         yield from self.receive_one_ping(ips, icmp_seq, timeout)
 
-    def one_ping(self, addresses: Iterable[str], icmp_seq: int = 1, timeout=SENTINEL) -> Iterable[dict]:
-        addr_map, errors = resolve_addresses(addresses)
-        for addr, error in errors.items():
-            yield dict(ip=addr, host=addr, error=error)
-        ips = set(addr_map)
-        for result in self._one_ping(ips, icmp_seq, timeout):
-            ip = result["ip"]
-            for info in addr_map[ip]:
-                result["host"] = info["host"]
-                yield result
-
     def raw_ping(
         self,
         ips: Iterable[str],
