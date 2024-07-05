@@ -162,7 +162,7 @@ def socket_wait_response(sock: socket.socket, timeout: float | None = None):
     logging.debug("waiting for reply...")
     r, _, _ = select.select((sock,), (), (), timeout)
     if not r:
-        raise TimeoutError("timed out")
+        raise TimeoutError()
     logging.debug("received reply")
 
 
@@ -178,10 +178,10 @@ def sockets_wait_response(socks, timeout=None):
     while socks:
         tout = end - time.monotonic()
         if tout <= 0:
-            raise TimeoutError("timed out")
+            raise TimeoutError()
         r, _, _ = select.select(socks, (), (), tout)
         if not r:
-            raise TimeoutError("timed out")
+            raise TimeoutError()
         yield from r
         socks -= set(r)
 

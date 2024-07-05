@@ -62,6 +62,7 @@ def receive_one_ping(sock: Socket, ips: Iterable[str], icmp_seq: int, timeout: f
         try:
             response = next(responses)
         except TimeoutError as error:
+            error = error.args[0] if error.args else "timeout"
             for ip in pending_ips:
                 yield {"ip": ip, "error": error}
             return
