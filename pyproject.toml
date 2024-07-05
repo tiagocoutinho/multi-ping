@@ -1,0 +1,85 @@
+#
+# This file is part of the multi-ping project
+#
+# Copyright (c) 2024 Tiago Coutinho
+# Distributed under the GPLv3 license. See LICENSE for more info.
+
+[project]
+name = "multi-ping"
+description = "ping library"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    { name = "Jose Tiago Macara Coutinho", email = "coutinhotiago@gmail.com" }
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+dynamic = ["version", "readme"]
+
+[project.urls]
+Documentation = "https://tiagocoutinho.github.io/multi-ping/"
+Homepage = "https://github.com/tiagocoutinho/multi-ping"
+Source = "https://github.com/tiagocoutinho/multi-ping"
+
+[project.optional-dependencies]
+dev = [
+    "build>=0.10.0",
+    "twine>=4.0.2",
+    "ward>=0.68.0b0",
+    "ward-coverage>=0.3.0",
+    "ruff>=0.3.0",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "pygments",
+    "pymdown-extensions",
+]
+
+[build-system]
+requires = ["setuptools >= 40.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "multiping.__version__"}
+readme = {file = ["README.md"], content-type = "text/markdown"}
+
+[tool.setuptools.packages.find]
+include = ["multiping"]
+
+[tool.ruff]
+lint.select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP",  # pyupgrade
+]
+lint.ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+    "W191", # indentation contains tabs
+]
+line-length = 120
+indent-width = 4
+target-version = "py39"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[project.scripts]
+multiping = "multiping.cli:main"
