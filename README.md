@@ -1,7 +1,3 @@
----
-hide:
-  - navigation
----
 
 # 🔔 Welcome to multi-ping
 
