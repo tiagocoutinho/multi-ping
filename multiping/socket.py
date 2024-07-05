@@ -90,7 +90,7 @@ def address_info(host_or_ip: str) -> dict[str, str]:
     host = host_or_ip
     if is_ip:
         try:
-            host = gethostbyaddr(ip)
+            host = gethostbyaddr(ip)[0]
         except OSError:
             pass
     logging.info("Resolved %s to (%s %s)...", host_or_ip, host, ip)
