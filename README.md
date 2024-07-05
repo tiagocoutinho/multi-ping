@@ -20,9 +20,13 @@ $ python -m asyncio
 >>> from multiping.aioping import ping
 >>> from multiping.tools import response_text
 
->>> async for response in ping(["gnu.org", "orcid.org"]):
+>>> async for response in ping(["gnu.org", "orcid.org"], count=2):
 ...    text = response_text(response)
 ...    print(text)
+64 bytes from orcid.org (104.20.228.70): icmp_seq=1 time=4.8ms
+64 bytes from gnu.org (209.51.188.116): icmp_seq=1 time=113.4ms
+64 bytes from orcid.org (104.20.228.70): icmp_seq=2 time=4.7ms
+64 bytes from gnu.org (209.51.188.116): icmp_seq=2 time=118.8ms
 ```
 
 Requirements:
