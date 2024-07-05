@@ -39,11 +39,11 @@ Without further ado:
 Sync works great too:
 
 ```python
-$ python -m asyncio
->>> from multiping.aioping import ping
+$ python
+>>> from multiping.ping import ping
 >>> from multiping.tools import response_text
 
->>> async for response in ping(["gnu.org", "orcid.org"]):
+>>> for response in ping(["gnu.org", "orcid.org"]):
 ...    text = response_text(response)
 ...    print(text)
 ```
