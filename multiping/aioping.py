@@ -4,6 +4,26 @@
 # Copyright (c) 2024 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
+"""
+Asynchronous multi-ping API.
+
+Here is an example using the functional API:
+
+```python
+import asyncio
+
+from multiping.ping import ping
+from multiping.tools import response_text
+
+async def pings(hosts):
+    async for response in ping(hosts, count=4):
+        text = response_text(response)
+        print(text)
+
+asyncio.run(pings(["gnu.org", "orcid.org"]))
+```
+"""
+
 import asyncio
 
 from collections.abc import Iterable, AsyncIterable
@@ -43,7 +63,29 @@ async def receive_one_ping(
 
 
 class AsyncPing:
-    """Handle several hosts with a single "shared" ICMP socket"""
+    """
+    Handle several hosts with a single "shared" ICMP socket.
+
+    Example:
+
+    ```python
+
+    import asyncio
+
+    from multiping.aioping import AsyncPing
+    from multiping.tools import response_text
+    from multiping.socket import Socket
+
+    async def pings():
+        sock = Socket()
+        ping = AsyncPing(sock, icmp_id, timeout)
+        async for response in ping.ping(hosts, interval, strict_interval, count):
+            text = response_text(response)
+            print(text)
+
+    asyncio.run(pings(["gnu.org", "orcid.org"]))
+    ```
+    """
 
     def __init__(self, sock: Socket, icmp_id: int | None = None, timeout: float | None = None):
         self.socket = sock
@@ -108,6 +150,29 @@ async def ping(
     count: int | None = None,
     timeout: float | None = 1,
 ):
+    """
+    Functional helper to ping a group of given hosts concurrently *count* number of
+    times separated by *interval (s)*.
+    Infinine sequence of pings (default) is achieved with *count=None*.
+    If *strict_interval* is True, a best effort is made to start group ping in fixed
+    periods.
+
+    Example:
+
+    ```python
+    import asyncio
+
+    from multiping.ping import ping
+    from multiping.tools import response_text
+
+    async def pings(hosts):
+        async for response in ping(hosts, count=4):
+            text = response_text(response)
+            print(text)
+
+    asyncio.run(pings(["gnu.org", "orcid.org"]))
+    ```
+    """
     sock = Socket()
     ping = AsyncPing(sock, icmp_id, timeout)
     async for response in ping.ping(hosts, interval, strict_interval, count):

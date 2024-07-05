@@ -146,11 +146,22 @@ def ping(
     timeout: float | None = 1,
 ) -> Iterable[dict]:
     """
-    Ping group of given hosts concurrently *count* number of times separated by *interval (s)*
+    Functional helper to ping a group of given hosts concurrently *count* number of
+    times separated by *interval (s)*.
+    Infinine sequence of pings (default) is achieved with *count=None*.
+    If *strict_interval* is True, a best effort is made to start group ping in fixed
+    periods.
 
-    Infinine sequence of pings (default) is achieved with *count=None*
+    Example:
 
-    If *strict_interval* is True, a best effort is made to
+    ```python
+    from multiping.ping import ping
+    from multiping.tools import response_text
+
+    for response in ping(["gnu.org", "orcid.org"], count=4):
+        text = response_text(response)
+        print(text)
+    ```
     """
     sock = Socket()
     ping = Ping(sock, icmp_id, timeout)
