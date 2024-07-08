@@ -1,19 +1,19 @@
 #
-# This file is part of the multi-ping project
+# This file is part of the yaping project
 #
 # Copyright (c) 2024 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 """
-Asynchronous multi-ping API.
+Asynchronous yaping API.
 
 Here is an example using the functional API:
 
 ```python
 import asyncio
 
-from multiping.ping import ping
-from multiping.tools import response_text
+from yaping.ping import ping
+from yaping.tools import response_text
 
 async def pings(hosts):
     async for response in ping(hosts, count=4):
@@ -72,9 +72,9 @@ class AsyncPing:
 
     import asyncio
 
-    from multiping.aioping import AsyncPing
-    from multiping.tools import response_text
-    from multiping.socket import Socket
+    from yaping.aioping import AsyncPing
+    from yaping.tools import response_text
+    from yaping.socket import Socket
 
     async def pings():
         sock = Socket()
@@ -162,8 +162,8 @@ async def ping(
     ```python
     import asyncio
 
-    from multiping.ping import ping
-    from multiping.tools import response_text
+    from yaping.ping import ping
+    from yaping.tools import response_text
 
     async def pings(hosts):
         async for response in ping(hosts, count=4):

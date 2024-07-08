@@ -3,15 +3,15 @@ hide:
   - navigation
 ---
 
-# 🔔 Welcome to multi-ping
+# 🔔 Welcome to yaping
 
 
-[![multiping][pypi-version]](https://pypi.python.org/pypi/multi-ping)
-[![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/multi-ping)
+[![yaping][pypi-version]](https://pypi.python.org/pypi/yaping)
+[![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/yaping)
 [![License][license]]()
-[![CI][CI]](https://github.com/tiagocoutinho/multi-ping/actions/workflows/ci.yml)
+[![CI][CI]](https://github.com/tiagocoutinho/yaping/actions/workflows/ci.yml)
 
-A python library for pinging multiple hosts.
+Yet another python library for pinging multiple hosts.
 
 It focuses on providing both sync and asynch versions and minimizing the amount of
 of OS resources (only a single socket is used for handling multiple hosts with
@@ -21,8 +21,8 @@ Without further ado:
 
 <div class="termy" data-ty-macos>
   <span data-ty="input" data-ty-prompt="$">python -m asyncio</span>
-  <span data-ty="input" data-ty-prompt=">>>">from multiping.ping import aioping</span>
-  <span data-ty="input" data-ty-prompt=">>>">from multiping.tools import response_text</span>
+  <span data-ty="input" data-ty-prompt=">>>">from yaping.ping import aioping</span>
+  <span data-ty="input" data-ty-prompt=">>>">from yaping.tools import response_text</span>
   <span data-ty="input" data-ty-prompt=">>>">async for response in ping(["gnu.org", "orcid.org"], count=4, interval=0.5, strict_interval=True):</span>
   <span data-ty="input" data-ty-prompt="...">    text = response_text(response)</span>
   <span data-ty="input" data-ty-prompt="...">    print(text)</span>
@@ -40,8 +40,8 @@ Sync works great too:
 
 ```python
 $ python
->>> from multiping.ping import ping
->>> from multiping.tools import response_text
+>>> from yaping.ping import ping
+>>> from yaping.tools import response_text
 
 >>> for response in ping(["gnu.org", "orcid.org"], count=2):
 ...    text = response_text(response)
@@ -62,24 +62,24 @@ Requirements:
 From within your favorite python environment:
 
 <div class="termy" data-ty-macos data-ty-title="bash" data-ty-typeDelay="30" >
-	<span data-ty="input" data-ty-prompt="$">pip install multi-ping</span>
-    <span data-ty="progress" >pip install multi-ping</span>
+	<span data-ty="input" data-ty-prompt="$">pip install yaping</span>
+    <span data-ty="progress" >pip install yaping</span>
 </div>
 
 To develop, run tests, build package, lint, etc you'll need:
 
 ```console
-$ pip install multi-ping[dev]
+$ pip install yaping[dev]
 ```
 
 To run docs you'll need:
 
 ```console
-$ pip install multi-ping[docs]
+$ pip install yaping[docs]
 ```
 
-[pypi-python-versions]: https://img.shields.io/pypi/pyversions/multi-ping.svg
-[pypi-version]: https://img.shields.io/pypi/v/multi-ping.svg
-[pypi-status]: https://img.shields.io/pypi/status/multi-ping.svg
-[license]: https://img.shields.io/pypi/l/multi-ping.svg
-[CI]: https://github.com/tiagocoutinho/multi-ping/actions/workflows/ci.yml/badge.svg
+[pypi-python-versions]: https://img.shields.io/pypi/pyversions/yaping.svg
+[pypi-version]: https://img.shields.io/pypi/v/yaping.svg
+[pypi-status]: https://img.shields.io/pypi/status/yaping.svg
+[license]: https://img.shields.io/pypi/l/yaping.svg
+[CI]: https://github.com/tiagocoutinho/yaping/actions/workflows/ci.yml/badge.svg

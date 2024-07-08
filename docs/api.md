@@ -1,19 +1,19 @@
-# Multi-ping reference API
+# yaping reference API
 
 Here's the reference or code API, the classes, functions, parameters, attributes, and
-all the multi-ping parts you can use in your applications.
+all the yaping parts you can use in your applications.
 
-If you want to **learn multi-ping** you are much better off reading the
-[MultiPing User Guide](https://tiagocoutinho.github.io/multi-ping/user_guide/).
+If you want to **learn yaping** you are much better off reading the
+[yaping User Guide](https://tiagocoutinho.github.io/yaping/user_guide/).
 
 ## Sync API
 
-::: multiping.ping
+::: yaping.ping
 
 ## Async API
 
-::: multiping.aioping
+::: yaping.aioping
 
 ## ICMP Socket
 
-::: multiping.socket
+::: yaping.socket

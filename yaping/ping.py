@@ -1,17 +1,17 @@
 #
-# This file is part of the multi-ping project
+# This file is part of the yaping project
 #
 # Copyright (c) 2024 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 """
-Synchronous multi-ping API.
+Synchronous yaping API.
 
 Here is an example using the functional API:
 
 ```python
-from multiping.ping import ping
-from multiping.tools import response_text
+from yaping.ping import ping
+from yaping.tools import response_text
 
 for response in ping(["gnu.org", "orcid.org"], count=4):
     text = response_text(response)
@@ -145,8 +145,8 @@ def ping(
     Example:
 
     ```python
-    from multiping.ping import ping
-    from multiping.tools import response_text
+    from yaping.ping import ping
+    from yaping.tools import response_text
 
     for response in ping(["gnu.org", "orcid.org"], count=4):
         text = response_text(response)

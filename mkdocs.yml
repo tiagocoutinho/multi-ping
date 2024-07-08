@@ -1,11 +1,11 @@
-site_name: Multi Ping
-site_url: https://tiagocoutinho.github.io/multi-ping
-site_description: Python ping library
+site_name: yaping
+site_url: https://tiagocoutinho.github.io/yaping
+site_description: Yet another python ping library
 site_author: Tiago Coutinho
 copyright: "© 2024 Tiago Coutinho"
 
-repo_url: https://github.com/tiagocoutinho/multi-ping
-repo_name: tiagocoutinho/multi-ping
+repo_url: https://github.com/tiagocoutinho/yaping
+repo_name: tiagocoutinho/yaping
 
 # disable editing code link
 edit_uri: ''
@@ -74,7 +74,7 @@ markdown_extensions:
     alternate_style: true
 
 nav:
-  - Multiping: index.md
+  - yaping: index.md
   - User guide: user_guide.md
   - API Reference: api.md
   - Developers corner: develop.md

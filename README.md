@@ -1,11 +1,11 @@
 
-# 🔔 Welcome to multi-ping
+# 🔔 Welcome to yaping
 
 
-[![multiping][pypi-version]](https://pypi.python.org/pypi/multi-ping)
-[![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/multi-ping)
+[![yaping][pypi-version]](https://pypi.python.org/pypi/yaping)
+[![Python Versions][pypi-python-versions]](https://pypi.python.org/pypi/yaping)
 [![License][license]]()
-[![CI][CI]](https://github.com/tiagocoutinho/multi-ping/actions/workflows/ci.yml)
+[![CI][CI]](https://github.com/tiagocoutinho/yaping/actions/workflows/ci.yml)
 
 A python library for pinging multiple hosts.
 
@@ -17,8 +17,8 @@ Without further ado:
 
 ```python
 $ python -m asyncio
->>> from multiping.aioping import ping
->>> from multiping.tools import response_text
+>>> from yaping.aioping import ping
+>>> from yaping.tools import response_text
 
 >>> async for response in ping(["gnu.org", "orcid.org"], count=2):
 ...    text = response_text(response)
@@ -38,23 +38,23 @@ Requirements:
 From within your favorite python environment:
 
 ```
-$ pip install multi-ping
+$ pip install yaping
 ```
 
 To develop, run tests, build package, lint, etc you'll need:
 
 ```console
-$ pip install multi-ping[dev]
+$ pip install yaping[dev]
 ```
 
 To run docs you'll need:
 
 ```console
-$ pip install multi-ping[docs]
+$ pip install yaping[docs]
 ```
 
-[pypi-python-versions]: https://img.shields.io/pypi/pyversions/multi-ping.svg
-[pypi-version]: https://img.shields.io/pypi/v/multi-ping.svg
-[pypi-status]: https://img.shields.io/pypi/status/multi-ping.svg
-[license]: https://img.shields.io/pypi/l/multi-ping.svg
-[CI]: https://github.com/tiagocoutinho/multi-ping/actions/workflows/ci.yml/badge.svg
+[pypi-python-versions]: https://img.shields.io/pypi/pyversions/yaping.svg
+[pypi-version]: https://img.shields.io/pypi/v/yaping.svg
+[pypi-status]: https://img.shields.io/pypi/status/yaping.svg
+[license]: https://img.shields.io/pypi/l/yaping.svg
+[CI]: https://github.com/tiagocoutinho/yaping/actions/workflows/ci.yml/badge.svg

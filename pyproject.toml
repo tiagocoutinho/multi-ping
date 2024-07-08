@@ -1,11 +1,11 @@
 #
-# This file is part of the multi-ping project
+# This file is part of the yaping project
 #
 # Copyright (c) 2024 Tiago Coutinho
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 [project]
-name = "multi-ping"
+name = "yaping"
 description = "ping library"
 license = {text = "GPL-3.0-or-later"}
 authors = [
@@ -27,9 +27,9 @@ dependencies = []
 dynamic = ["version", "readme"]
 
 [project.urls]
-Documentation = "https://tiagocoutinho.github.io/multi-ping/"
-Homepage = "https://github.com/tiagocoutinho/multi-ping"
-Source = "https://github.com/tiagocoutinho/multi-ping"
+Documentation = "https://tiagocoutinho.github.io/yaping/"
+Homepage = "https://github.com/tiagocoutinho/yaping"
+Source = "https://github.com/tiagocoutinho/yaping"
 
 [project.optional-dependencies]
 dev = [
@@ -51,11 +51,11 @@ requires = ["setuptools >= 40.9.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {attr = "multiping.__version__"}
+version = {attr = "yaping.__version__"}
 readme = {file = ["README.md"], content-type = "text/markdown"}
 
 [tool.setuptools.packages.find]
-include = ["multiping"]
+include = ["yaping"]
 
 [tool.ruff]
 lint.select = [
@@ -81,4 +81,4 @@ target-version = "py39"
 combine-as-imports = true
 
 [project.scripts]
-multiping = "multiping.cli:main"
+yaping = "yaping.cli:main"

@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from multiping import ping
+from yaping import ping
 
 
 REQ = b'\x08\x00\xdd\xc8\x00\x01\x00\x01\x00\x00\x00\x00\x00@\x8f@QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ'
@@ -13,11 +13,11 @@ DEFAULT_IP = "127.0.0.1"
 DEFAULT_ADDR = (DEFAULT_IP, 55)
 
 def mock_sendto():
-    return mock.patch("multiping.socket.Socket.sendto", return_value=64)
+    return mock.patch("yaping.socket.Socket.sendto", return_value=64)
 
 
 def mock_recvfrom(packet=REP, addr=DEFAULT_ADDR):
-    return mock.patch("multiping.socket.Socket.recvfrom", return_value=(packet, addr))
+    return mock.patch("yaping.socket.Socket.recvfrom", return_value=(packet, addr))
 
 
 def mock_select(result=None):
