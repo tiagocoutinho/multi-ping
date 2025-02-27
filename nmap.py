@@ -1,5 +1,6 @@
 import errno
 import ipaddress
+import logging
 import os
 import resource
 import selectors
@@ -27,9 +28,16 @@ def tcp_socket() -> socket.socket:
     return sock
 
 
-def tcp_connections(addresses: list[tuple[str, int]], timeout=None):
-    available = (max_open_files() - nb_open_files()) - 10
+def sock_error(sock):
+    return sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+
+
+def tcp_connections(addresses: list[tuple[str, int]], timeout=None, max_open=None):
     pending_addresses = list(addresses)
+    available = (max_open_files() - nb_open_files()) - 10
+    if max_open:
+        available = min(available, max_open)
+    logging.info("Using maximum of %d sockets at a time", available)
     sockets = {}
     selector = selectors.DefaultSelector()
 
@@ -37,6 +45,7 @@ def tcp_connections(addresses: list[tuple[str, int]], timeout=None):
         nonlocal available
         while available > 0 and pending_addresses:
             address = pending_addresses.pop()
+            logging.debug("start connecting to %s (available=%d)", address, available)
             sock = tcp_socket()
             sockets[sock] = address
             selector.register(sock, selectors.EVENT_WRITE)
@@ -60,9 +69,8 @@ def tcp_connections(addresses: list[tuple[str, int]], timeout=None):
                 break
             for key, _ in result:
                 sock = key.fileobj
-                result = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
                 address = sockets.pop(sock)
-                yield address, result
+                yield address, sock_error(sock)
                 selector.unregister(sock)
                 sock.close()
                 available += 1
@@ -73,9 +81,9 @@ def tcp_connections(addresses: list[tuple[str, int]], timeout=None):
             sock.close()
 
 
-def nmap(addresses, timeout=None):
+def nmap(addresses, timeout=None, max_open=None):
     errors = {}
-    for (host, port), error in tcp_connections(addresses, timeout=timeout):
+    for (host, port), error in tcp_connections(addresses, timeout=timeout, max_open=max_open):
         addr = f"{host}:{port}"
         if error:
             errors.setdefault(error, []).append(addr)
