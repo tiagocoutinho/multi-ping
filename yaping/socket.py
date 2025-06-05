@@ -236,7 +236,8 @@ class Socket(socket.socket):
         proto = ICMPv4.proto if family == socket.AF_INET else ICMPv6.proto
         if type is None:
             type = socket.SOCK_RAW if CAN_HAVE_IP_HEADER else socket.SOCK_DGRAM
-        super().__init__(family, type, proto)
+        breakpoint()
+        super().__init__(family, type), proto)
         self.settimeout(timeout)
 
     has_ip_header: bool = property(socket_has_ip_header)

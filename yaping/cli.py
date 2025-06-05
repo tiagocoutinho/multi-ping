@@ -6,22 +6,13 @@
 
 import argparse
 import asyncio
-import ipaddress
 import logging
 
 from collections.abc import Iterable
 
 from . import aioping, ping, tools
 
-# from .host import ping_many
-from .tools import response_text
-
-
-def addresses_args(text):
-    try:
-        return [str(addr) for addr in ipaddress.ip_network(text)]
-    except ValueError:
-        return [text]
+from .tools import ip_addresses, response_text
 
 
 def cmd_line_parser() -> argparse.ArgumentParser:
@@ -57,7 +48,7 @@ def cmd_line_parser() -> argparse.ArgumentParser:
         help="use asyncio",
         action="store_true",
     )
-    parser.add_argument("addresses", type=addresses_args, nargs="+", help="host names, IPs or networks")
+    parser.add_argument("addresses", type=ip_addresses, nargs="+", help="host names, IPs or networks")
     return parser
 
 

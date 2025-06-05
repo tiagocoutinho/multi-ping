@@ -5,12 +5,17 @@
 # Distributed under the GPLv3 license. See LICENSE for more info.
 
 import asyncio
+import ipaddress
 import time
 import uuid
 
 
 SENTINEL = object()
 
+
+def ip_addresses(text):
+    return [str(addr) for addr in ipaddress.ip_network(text)]
+    
 
 def new_id() -> int:
     """Return a "unique" 16-bit integer ID"""
