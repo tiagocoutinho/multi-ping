@@ -53,6 +53,14 @@ To run docs you'll need:
 $ pip install yaping[docs]
 ```
 
+## Setup
+
+Some systems require this adjustment to be able to create datagram icmp sockets:
+
+```
+sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
+```
+
 [pypi-python-versions]: https://img.shields.io/pypi/pyversions/yaping.svg
 [pypi-version]: https://img.shields.io/pypi/v/yaping.svg
 [pypi-status]: https://img.shields.io/pypi/status/yaping.svg
