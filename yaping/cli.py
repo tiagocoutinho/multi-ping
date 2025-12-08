@@ -8,7 +8,6 @@ import argparse
 import asyncio
 import ipaddress
 import logging
-
 from collections.abc import Iterable
 
 from . import aioping, ping, tools

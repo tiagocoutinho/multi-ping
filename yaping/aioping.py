@@ -12,7 +12,7 @@ Here is an example using the functional API:
 ```python
 import asyncio
 
-from yaping.ping import ping
+from yaping.aioping import ping
 from yaping.tools import response_text
 
 async def pings(hosts):
@@ -25,11 +25,10 @@ asyncio.run(pings(["gnu.org", "orcid.org"]))
 """
 
 import asyncio
+from collections.abc import AsyncIterable, Iterable
 
-from collections.abc import Iterable, AsyncIterable
-
-from .socket import async_resolve_addresses, Socket
-from .tools import cycle, new_id, async_intervals, SENTINEL
+from .socket import Socket, async_resolve_addresses
+from .tools import SENTINEL, async_intervals, cycle, new_id
 
 
 async def receive_one_ping(
@@ -135,7 +134,7 @@ class AsyncPing:
     ):
         addr_map, errors = await async_resolve_addresses(addresses)
         for addr, error in errors.items():
-            yield dict(ip=addr, host=addr, error=error)
+            yield {"ip": addr, "host": addr, "error": error}
         ips = set(addr_map)
         async for result in self.raw_ping(ips, interval, strict_interval, count, timeout):
             for info in addr_map[result["ip"]]:

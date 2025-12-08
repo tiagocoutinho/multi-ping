@@ -8,8 +8,8 @@ import ipaddress
 import socket
 import time
 
-from .socket import gethostbyname, gethostbyaddr, Socket, sockets_wait_response
-from .tools import cycle, new_id, response_text, SENTINEL
+from .socket import Socket, gethostbyaddr, gethostbyname, sockets_wait_response
+from .tools import SENTINEL, cycle, new_id, response_text
 
 
 class Host:

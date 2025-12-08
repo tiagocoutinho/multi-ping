@@ -10,7 +10,6 @@ import logging
 import select
 import socket
 import time
-
 from collections.abc import Iterable
 
 try:
@@ -22,10 +21,10 @@ except ModuleNotFoundError:
 from .protocol import (
     ICMP_DEFAULT_SIZE,
     IP_HEADER,
-    encode_request,
-    decode_response,
     ICMPv4,
     ICMPv6,
+    decode_response,
+    encode_request,
 )
 
 

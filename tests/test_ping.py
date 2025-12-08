@@ -5,12 +5,12 @@ import pytest
 
 from yaping import ping
 
-
-REQ = b'\x08\x00\xdd\xc8\x00\x01\x00\x01\x00\x00\x00\x00\x00@\x8f@QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ'
-REP = b'\x00' b'\x00' b'\x00\x00' b'\x00\x01' b'\x00\x01' + 56*b'Q'
+REQ = b"\x08\x00\xdd\xc8\x00\x01\x00\x01\x00\x00\x00\x00\x00@\x8f@QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+REP = b"\x00\x00\x00\x00\x00\x01\x00\x01" + 56 * b"Q"
 
 DEFAULT_IP = "127.0.0.1"
 DEFAULT_ADDR = (DEFAULT_IP, 55)
+
 
 def mock_sendto():
     return mock.patch("yaping.socket.Socket.sendto", return_value=64)
@@ -29,7 +29,7 @@ def mock_select(result=None):
 def test_ping_call():
     stream = ping.ping([DEFAULT_IP])
     assert inspect.isgenerator(stream)
-    
+
 
 def test_ping_invalid_address():
     stream = ping.ping(["bad address"])
@@ -44,11 +44,12 @@ def test_ping_invalid_address():
 def test_ping_timeout():
     ip = DEFAULT_IP
     stream = ping.ping([ip])
-    with mock_sendto(), mock_select(((),(),())):
+    with mock_sendto(), mock_select(((), (), ())):
         result = next(stream)
         assert result["ip"] == ip
         assert result["host"] == "localhost"
         assert "timeout" in result["error"].lower()
+
 
 def test_ping():
     ip = DEFAULT_IP
@@ -60,4 +61,3 @@ def test_ping():
         sendto.assert_called_once()
         select.assert_called_once()
         recvfrom.assert_called_once()
-

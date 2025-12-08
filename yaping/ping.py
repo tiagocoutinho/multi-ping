@@ -22,17 +22,17 @@ for response in ping(["gnu.org", "orcid.org"], count=4):
 import contextlib
 import logging
 import time
-
 from collections.abc import Callable, Iterable
 
-from .socket import resolve_addresses, Socket
-from .tools import cycle, new_id, intervals, SENTINEL
+from .socket import Socket, resolve_addresses
+from .tools import SENTINEL, cycle, intervals, new_id
 
 
 @contextlib.contextmanager
 def remaining_time(timeout) -> Iterable[Callable[[], float]]:
     if timeout is None:
-        remaining = lambda: None
+        def remaining():
+            return None
     else:
         start = time.perf_counter()
 
@@ -118,7 +118,7 @@ class Ping:
     ) -> Iterable[dict]:
         addr_map, errors = resolve_addresses(addresses)
         for addr, error in errors.items():
-            yield dict(ip=addr, host=addr, error=error)
+            yield {"ip": addr, "host": addr, "error": error}
         ips = set(addr_map)
         for result in self.raw_ping(ips, interval, strict_interval, count, timeout):
             ip = result["ip"]

@@ -9,7 +9,6 @@ import socket
 import struct
 import time
 
-
 HEADER_FORMAT = "!BBHHH"
 HEADER = struct.Struct(HEADER_FORMAT)
 
@@ -122,7 +121,7 @@ def encode_request(
 def decode_response(payload: bytes, with_ip_header: bool = False) -> dict:
     offset = IP_HEADER.size if with_ip_header else 0
     header = Header.from_buffer_copy(payload, offset)
-    if not header.type in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}:
+    if header.type not in {ICMPv4.ECHO_REPLY, ICMPv6.ECHO_REPLY}:
         raise ValueError(f"Wrong type: {header.type}")
     (time_sent,) = TIME.unpack_from(payload, offset=offset + HEADER.size)
     return {
