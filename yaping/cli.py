@@ -94,7 +94,7 @@ def run(addresses: Iterable[str], **kwargs):
     except KeyboardInterrupt:
         print()
     finally:
-        print(stats)
+        print(stats.table())
 
 
 def main(args=None):

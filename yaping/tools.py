@@ -8,6 +8,8 @@ import asyncio
 import time
 import uuid
 
+from tabulate import tabulate
+
 SENTINEL = object()
 
 
@@ -118,6 +120,22 @@ class PingStats:
 
     def __str__(self):
         return "\n".join(str(stats) for stats in self.stats.values() if stats.ok)
+
+    def table(self):
+        lines = []
+        for stats in self.stats.values():
+            lines.append(
+                (
+                    stats.host,
+                    stats.total,
+                    stats.ok,
+                    int(stats.loss * 100),
+                    stats.min * 1000,
+                    stats.max * 1000,
+                    stats.avg * 1000,
+                )
+            )
+        return tabulate(lines, headers=["Host", "Transmitted", "Received", "% loss", "rtt min", "rtt max", "rtt avg"])
 
 
 def intervals(stream, interval: float, strict: bool = False):
