@@ -20,7 +20,7 @@ for response in ping(["gnu.org", "orcid.org"], count=4, interval=0.5, strict_int
 ```python
 import asyncio
 
-from yaping.ping import ping
+from yaping.aioping import ping
 from yaping.tools import response_text
 
 async def pings(hosts):
@@ -29,4 +29,20 @@ async def pings(hosts):
         print(text)
 
 asyncio.run(pings(["gnu.org", "orcid.org"]))
+```
+
+## Collect statistics
+
+```python
+
+from yaping.ping import ping
+from yaping.tools import response_text, PingStats
+
+stream = ping(["gnu.org", "orcid.org"], count=4, interval=0.5, strict_interval=True)
+stats = PingStats(stream)
+
+for response in stats:
+    print(response_text(response))
+
+print(stats.table())
 ```
